@@ -8,6 +8,9 @@ from pathlib import Path
 import os
 import plotly.express as px
 import random
+import torch
+import torch.nn as nn
+
 
 # ----------------------------
 # CONFIG
@@ -396,13 +399,39 @@ def page_results():
         except:
             st.warning("⚠️ Image 'img/loss_batch_size.png' introuvable.")
 
+
+
 # ----------------------------
-# LOGIQUE METIER (Calcul du DPE)
+# PAGE 4: simulation avec le modèle entrainé
+# ----------------------------
+
+# ----------------------------
+# MODEL DEFINITION (identique à l'entraînement)
+# ----------------------------
+class MLPRegressorBN(nn.Module):
+    def __init__(self, n_features, hidden_sizes=(256, 128, 64), dropout=0.1):
+        super().__init__()
+        layers = []
+        in_dim = n_features
+
+        for h in hidden_sizes:
+            layers.append(nn.Linear(in_dim, h))
+            layers.append(nn.BatchNorm1d(h))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout))
+            in_dim = h
+
+        layers.append(nn.Linear(in_dim, 1))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+# ----------------------------
+# LOGIQUE METIER (classe DPE)
 # ----------------------------
 def get_classe_dpe(conso, ges):
-    """
-    Méthode du double seuil (2021) : on prend la pire note entre Conso et GES.
-    """
     seuils = {
         "A": [70, 6],
         "B": [110, 11],
@@ -423,40 +452,59 @@ def get_classe_dpe(conso, ges):
     letter_g = get_letter(ges, 1)
 
     order = "ABCDEFG"
-    # "pire" = lettre plus loin dans l'alphabet
     return letter_c if order.index(letter_c) > order.index(letter_g) else letter_g
 
 
 # ----------------------------
-# CHARGEMENT MODELE
+# CHARGEMENT DES ARTEFACTS
 # ----------------------------
 @st.cache_resource
-def load_pipeline(model_path: str):
+def load_artifacts(artifact_dir: str):
+    artifact_dir = Path(artifact_dir)
+
+    preprocess = joblib.load(artifact_dir / "preprocess.joblib")
+    y_scaler = joblib.load(artifact_dir / "y_scaler.joblib")
+
+    ckpt = torch.load(artifact_dir / "model.pt", map_location="cpu")
+    cfg = ckpt.get("model_config", {})
+
+    n_features = int(cfg.get("n_features"))
+    hidden_sizes = tuple(cfg.get("hidden_sizes", (256, 128, 64)))
+    dropout = float(cfg.get("dropout", 0.1))
+
+    model = MLPRegressorBN(
+        n_features=n_features,
+        hidden_sizes=hidden_sizes,
+        dropout=dropout,
+    )
+    model.load_state_dict(ckpt["state_dict"])
+    model.eval()
+
+    return preprocess, y_scaler, model
+
+
+def predict_conso(preprocess, y_scaler, model, raw_features: dict) -> float:
     """
-    Charge ton pipeline sklearn (préprocess + modèle) depuis un .joblib
+    raw_features : dict avec les COLONNES BRUTES (avant preprocess)
     """
-    return joblib.load(model_path)
+    X_raw = pd.DataFrame([raw_features])
 
+    # Important: éviter les NaN côté cat (même si preprocess impute)
+    # (Le SimpleImputer cat remplace NaN par "Vide", donc ok, mais on sécurise)
+    X_raw = X_raw.replace({None: np.nan})
 
-def predict_conso(pipeline, features: dict) -> float:
-    """
-    features: dict {col: value} avec EXACTEMENT les colonnes attendues
-    Retourne une conso prédite (float).
-    """
-    X = pd.DataFrame([features])
+    # 1) preprocess -> matrice numérique
+    X_scaled = preprocess.transform(X_raw)
 
-    # Sécurités simples
-    # - évite NaN surprise
-    X = X.fillna("Vide")
+    # 2) torch
+    X_tensor = torch.tensor(np.asarray(X_scaled, dtype=np.float32))
 
-    y_pred = pipeline.predict(X)
+    with torch.no_grad():
+        y_scaled_pred = model(X_tensor).cpu().numpy()  # shape (1,1)
 
-    # y_pred peut être array([val]) ou liste
-    conso = float(np.ravel(y_pred)[0])
-
-    # Optionnel : borner et arrondir pour un rendu UI propre
-    conso = max(0.0, conso)
-    return conso
+    # 3) inverse scaling -> conso réelle
+    y_pred = y_scaler.inverse_transform(y_scaled_pred)[0, 0]
+    return float(max(0.0, y_pred))
 
 
 # ----------------------------
@@ -464,48 +512,31 @@ def predict_conso(pipeline, features: dict) -> float:
 # ----------------------------
 def page_simulator():
     st.title("🏗️ Simulateur de Performance Énergétique")
-    st.markdown(
-        """
-        Remplissez les caractéristiques du logement pour estimer sa consommation et son étiquette DPE.
-        *Note : la consommation est prédite par le modèle, les GES sont simulés (random).*
-        """
-    )
 
-    # Chemin vers ton pipeline joblib
-    # -> adapte-le à ton projet
-    MODEL_PATH = "models/20251228-conso/preprocess.joblib"
+    ARTIFACT_DIR = "models/20251228-conso"
 
     try:
-        pipeline = load_pipeline(MODEL_PATH)
+        preprocess, y_scaler, model = load_artifacts(ARTIFACT_DIR)
     except Exception as e:
         st.error(
-            f"Impossible de charger le modèle depuis `{MODEL_PATH}`.\n\n"
+            f"Impossible de charger les artefacts depuis `{ARTIFACT_DIR}`.\n\n"
+            f"Attendus : preprocess.joblib, y_scaler.joblib, model.pt\n\n"
             f"Détail : {e}"
         )
         st.stop()
 
-    # Options EXACTES issues de ton training (celles que tu as listées)
+    # ✅ options issues de ton training (tu peux garder celles que tu as déjà extraites)
+    # NB: j'utilise ici tes form_options "propres" (celles en bas de ton message)
     form_options = {
-        "type_batiment": ["appartement", "maison"],
-        "periode_construction": [
-            "1948-1974",
-            "1975-1977",
-            "1978-1982",
-            "1983-1988",
-            "1989-2000",
-            "2001-2005",
-            "2006-2012",
-            "2013-2021",
-            "après 2021",
-            "avant 1948",
-        ],
-        "type_installation_chauffage": [
-            "Vide",
-            "collectif",
-            "individuel",
-            "mixte (collectif-individuel)",
-        ],
         "classe_altitude": ["400-800m", "inférieur à 400m", "supérieur à 800m"],
+        "periode_construction": [
+            "1948-1974", "1975-1977", "1978-1982", "1983-1988", "1989-2000",
+            "2001-2005", "2006-2012", "2013-2021", "après 2021", "avant 1948"
+        ],
+        "type_batiment": ["appartement", "maison"],
+        "type_installation_chauffage": ["Vide", "collectif", "individuel", "mixte (collectif-individuel)"],
+        "type_installation_ecs": ["INCONNU", "collectif", "individuel", "mixte (collectif-individuel)"],
+        "zone_clim_simple": ["H1", "H2", "H3"],
         "type_energie_principale_chauffage": [
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
@@ -561,6 +592,22 @@ def page_simulator():
             "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
         ],
+        "type_energie_n2": [
+            "AUCUN",
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
         "type_energie_principale_ecs": [
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
@@ -577,7 +624,6 @@ def page_simulator():
             "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
         ],
-        "type_installation_ecs": ["INCONNU", "collectif", "individuel", "mixte (collectif-individuel)"],
         "type_generateur_chauffage_principal": [
             "Autres",
             "Chaudière gaz à condensation 2001-2015",
@@ -596,84 +642,65 @@ def page_simulator():
             "Chaudière gaz à condensation après 2015",
             "Vide",
         ],
-        "type_energie_n2": [
-            "AUCUN",
-            "Bois – Bûches",
-            "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
-            "Bois – Plaquettes forestières",
-            "Butane",
-            "Charbon",
-            "Fioul domestique",
-            "GPL",
-            "Gaz naturel",
-            "Propane",
-            "Réseau de Chauffage urbain",
-            "Électricité",
-            "Électricité d'origine renouvelable utilisée dans le bâtiment",
-        ],
-        "zone_clim_simple": ["H1", "H2", "H3"],
+        # ⚠️ Ces 4-là sont dans col_oe => ordinal_map => ce sont bien des inputs à fournir !
+        "qualite_isolation_enveloppe": ["insuffisante", "moyenne", "bonne", "très bonne"],
+        "qualite_isolation_murs": ["insuffisante", "moyenne", "bonne", "très bonne"],
+        "qualite_isolation_plancher_haut": ["insuffisante", "moyenne", "bonne", "très bonne"],
+        "classe_inertie_batiment": ["Légère", "Moyenne", "Lourde", "Très lourde"],
     }
 
-    with st.form("form_simulation"):
-        st.subheader("1. Caractéristiques utilisées par le modèle")
+    st.markdown(
+        """
+        Remplissez les caractéristiques du logement.
+        - **Consommation** : prédite par le modèle PyTorch.
+        - **GES** : simulé (random).
+        """
+    )
 
+    with st.form("form_simulation"):
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            type_batiment = st.selectbox("Type de bâtiment", form_options["type_batiment"])
-            periode_construction = st.selectbox("Période de construction", form_options["periode_construction"])
-            classe_altitude = st.selectbox("Classe d'altitude", form_options["classe_altitude"])
+            type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"])
+            periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
+            classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"])
             zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
 
         with c2:
-            type_installation_chauffage = st.selectbox(
-                "Type installation chauffage",
-                form_options["type_installation_chauffage"],
-            )
-            type_energie_principale_chauffage = st.selectbox(
-                "Énergie principale chauffage",
-                form_options["type_energie_principale_chauffage"],
-            )
-            type_generateur_chauffage_principal = st.selectbox(
-                "Générateur chauffage principal",
-                form_options["type_generateur_chauffage_principal"],
-            )
+            type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"])
+            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"])
+            type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
+            type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
 
         with c3:
-            type_emetteur_installation_chauffage_n1 = st.selectbox(
-                "Type émetteur chauffage (n1)",
-                form_options["type_emetteur_installation_chauffage_n1"],
-            )
-            type_installation_ecs = st.selectbox(
-                "Type installation ECS",
-                form_options["type_installation_ecs"],
-            )
-            type_energie_principale_ecs = st.selectbox(
-                "Énergie principale ECS",
-                form_options["type_energie_principale_ecs"],
-            )
+            type_installation_ecs = st.selectbox("Installation ECS", form_options["type_installation_ecs"])
+            type_energie_principale_ecs = st.selectbox("Énergie principale ECS", form_options["type_energie_principale_ecs"])
+            type_generateur_chauffage_principal_ecs = st.selectbox("Générateur chauffage principal ECS", form_options["type_generateur_chauffage_principal_ecs"])
 
-        with st.expander("Paramètres avancés (énergies secondaires / détails ECS)"):
-            ac1, ac2 = st.columns(2)
-            with ac1:
+        with st.expander("Isolation / inertie (utilisé par le modèle)"):
+            ic1, ic2 = st.columns(2)
+            with ic1:
+                qualite_isolation_enveloppe = st.selectbox("Qualité isolation enveloppe", form_options["qualite_isolation_enveloppe"])
+                qualite_isolation_murs = st.selectbox("Qualité isolation murs", form_options["qualite_isolation_murs"])
+            with ic2:
+                qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"])
+                classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"])
+
+        with st.expander("Énergies secondaires (optionnel)"):
+            e1, e2 = st.columns(2)
+            with e1:
                 type_energie_n1 = st.selectbox("Type énergie n°1", form_options["type_energie_n1"])
-                type_energie_generateur_n1_ecs_n1 = st.selectbox(
-                    "Type énergie générateur n°1 ECS (n1)",
-                    form_options["type_energie_generateur_n1_ecs_n1"],
-                )
-            with ac2:
+                type_energie_generateur_n1_ecs_n1 = st.selectbox("Énergie générateur n°1 ECS", form_options["type_energie_generateur_n1_ecs_n1"])
+            with e2:
                 type_energie_n2 = st.selectbox("Type énergie n°2", form_options["type_energie_n2"])
-                type_generateur_chauffage_principal_ecs = st.selectbox(
-                    "Générateur chauffage principal ECS",
-                    form_options["type_generateur_chauffage_principal_ecs"],
-                )
 
         submitted = st.form_submit_button("🚀 Lancer la simulation", use_container_width=True)
 
     if submitted:
-        # ✅ Construction EXACTE des features attendues par le modèle
-        features = {
+        # 🔥 IMPORTANT :
+        # Le preprocess utilise cat_selector/num_selector => il attend les colonnes brutes présentes à l'entraînement.
+        # Ici on remplit au minimum celles dont tu as les modalités + les 4 ordinales.
+        raw_features = {
             "type_batiment": type_batiment,
             "periode_construction": periode_construction,
             "type_installation_chauffage": type_installation_chauffage,
@@ -682,29 +709,33 @@ def page_simulator():
             "type_emetteur_installation_chauffage_n1": type_emetteur_installation_chauffage_n1,
             "type_energie_generateur_n1_ecs_n1": type_energie_generateur_n1_ecs_n1,
             "type_energie_n1": type_energie_n1,
+            "type_energie_n2": type_energie_n2,
             "type_energie_principale_ecs": type_energie_principale_ecs,
             "type_installation_ecs": type_installation_ecs,
             "type_generateur_chauffage_principal": type_generateur_chauffage_principal,
             "type_generateur_chauffage_principal_ecs": type_generateur_chauffage_principal_ecs,
-            "type_energie_n2": type_energie_n2,
             "zone_clim_simple": zone_clim_simple,
+            # ordinal_map:
+            "qualite_isolation_enveloppe": qualite_isolation_enveloppe,
+            "qualite_isolation_murs": qualite_isolation_murs,
+            "qualite_isolation_plancher_haut": qualite_isolation_plancher_haut,
+            "classe_inertie_batiment": classe_inertie_batiment,
         }
 
-        # ✅ conso via modèle
         try:
-            conso_pred = predict_conso(pipeline, features)
+            conso_pred = predict_conso(preprocess, y_scaler, model, raw_features)
         except Exception as e:
             st.error(
-                "Erreur pendant la prédiction du modèle. "
-                "Vérifie que les noms de colonnes et les modalités correspondent à l'entraînement.\n\n"
+                "Erreur pendant la prédiction.\n\n"
+                "Cause la plus fréquente : il manque des colonnes attendues par le preprocess "
+                "(car tu utilises cat_selector/num_selector à l'entraînement).\n\n"
                 f"Détail : {e}"
             )
             st.stop()
 
-        # ✅ GES en random (comme demandé)
+        # GES random (comme demandé)
         ges_simule = random.randint(2, 68)
 
-        # ✅ Classe DPE (double seuil)
         classe_finale = get_classe_dpe(conso_pred, ges_simule)
 
         st.divider()
@@ -713,44 +744,34 @@ def page_simulator():
         col_res1, col_res2 = st.columns([1, 2])
 
         with col_res1:
-            st.markdown("### Indicateurs")
             st.metric("Consommation (Ep)", f"{conso_pred:.0f} kWh/m²/an")
             st.metric("Émissions (GES)", f"{ges_simule} kgCO₂/m²/an")
 
             color_map = {
-                "A": "#009036",
-                "B": "#53af31",
-                "C": "#c6d300",
-                "D": "#fce600",
-                "E": "#fbba00",
-                "F": "#eb6105",
-                "G": "#d40f14",
+                "A": "#009036", "B": "#53af31", "C": "#c6d300", "D": "#fce600",
+                "E": "#fbba00", "F": "#eb6105", "G": "#d40f14",
             }
             st.markdown(
                 f"""
-                <div style="text-align: center; background-color: {color_map[classe_finale]};
-                            padding: 10px; border-radius: 10px;">
-                    <h1 style="color: white; margin:0;">CLASSE {classe_finale}</h1>
+                <div style="text-align:center; background-color:{color_map[classe_finale]};
+                            padding:10px; border-radius:10px;">
+                    <h1 style="color:white; margin:0;">CLASSE {classe_finale}</h1>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
         with col_res2:
-            st.markdown("### Étiquette Officielle")
             base_url = "https://www.outils.immo/outils-immo.php"
             params = (
                 f"?type=dpe&modele=2021&valeur={int(round(conso_pred))}"
                 f"&lettre={classe_finale}&valeurges={ges_simule}"
             )
-            full_url = base_url + params
-            st.image(
-                full_url,
-                caption=f"DPE généré pour {conso_pred:.0f} kWh et {ges_simule} kgCO₂",
-                use_container_width=True,
-            )
+            st.image(base_url + params, use_container_width=True)
 
-        st.success("Simulation terminée avec succès (Conso via modèle, GES aléatoire).")
+        st.success("Simulation terminée (Conso via modèle, GES random).")
+        with st.expander("🔎 Données envoyées au modèle (debug)"):
+            st.json(raw_features)
 
 # ----------------------------
 # ROUTER
