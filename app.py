@@ -847,8 +847,6 @@ def page_simulator():
     st.markdown(
         """
         Remplissez les caractéristiques du logement.
-        - **Consommation** : prédite par le modèle PyTorch.
-        - **GES** : prédit par le modèle PyTorch.
         """
     )
 
@@ -903,7 +901,7 @@ def page_simulator():
                 type_energie_generateur_n1_ecs_n1 = st.selectbox("Énergie générateur n°1 ECS", form_options["type_energie_generateur_n1_ecs_n1"])
             with e2:
                 type_energie_n2 = st.selectbox("Type énergie n°2", form_options["type_energie_n2"])
-        submitted = st.form_submit_button("🚀 Lancer la prédiction", use_container_width=True)
+    submitted = st.form_submit_button("🚀 Lancer la prédiction", use_container_width=True)
 
     if submitted:
         # 🔥 IMPORTANT :
