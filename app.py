@@ -859,10 +859,10 @@ def page_simulator():
             type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"], index=1)
             surface_habitable_logement = st.number_input(
             "Surface habitable (m²)",
-            min_value=9.0,
-            max_value=500.0,
+            min_value=9,
+            max_value=500,
             value=80,
-            step=1.0
+            step=1
             )
             periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
             classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"], index=0)
@@ -873,9 +873,7 @@ def page_simulator():
             valeur_par_defaut_type_energie_principale_chauffage = "Électricité"
             # On cherche l'index de "Cerise" dans la liste
             default_index_type_energie_principale_chauffage = form_options["type_energie_principale_chauffage"].index(valeur_par_defaut_type_energie_principale_chauffage)
-            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", 
-            form_options["type_energie_principale_chauffage"],
-            index=default_index_type_energie_principale_chauffage)
+            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"], index=default_index_type_energie_principale_chauffage)
             type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
             type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
 
