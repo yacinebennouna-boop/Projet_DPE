@@ -190,10 +190,6 @@ class RareCategoryGrouper(BaseEstimator, TransformerMixin):
 
 
 
-
-
-
-
 # ----------------------------
 # CONFIG
 # ----------------------------
@@ -757,6 +753,7 @@ def page_simulator():
             "radiateur électrique NFC  NF** et NF***",
         ],
         "type_energie_generateur_n1_ecs_n1": [
+            "Électricité",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
             "Bois – Plaquettes d’industrie",
@@ -768,7 +765,6 @@ def page_simulator():
             "Gaz naturel",
             "Propane",
             "Réseau de Chauffage urbain",
-            "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
             "Vide",
         ],
