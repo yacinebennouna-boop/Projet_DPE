@@ -198,7 +198,7 @@ class RareCategoryGrouper(BaseEstimator, TransformerMixin):
 # CONFIG
 # ----------------------------
 st.set_page_config(
-    page_title="Simulateur DPE - Projet ML",
+    page_title="Prédiction DPE - Projet datascience",
     page_icon="🏠",
     layout="wide",
 )
@@ -227,7 +227,7 @@ page = st.sidebar.radio(
         "🏁 Présentation",
         "📊 Dataviz",
         "📈 Résultats d'entraînement",
-        "🧮 Simulateur DPE",
+        "🧮 Prédiction DPE",
     ],
 )
 
@@ -696,7 +696,7 @@ def predict_from_model(preprocess, y_scaler, model, raw_features: dict) -> float
 # PAGE STREAMLIT
 # ----------------------------
 def page_simulator():
-    st.title("🏗️ Simulateur de Performance Énergétique")
+    st.title("🏗️ Simulateur de DPE")
 
     ARTIFACT_DIR_CONSO = "models/20251228-conso"
     ARTIFACT_DIR_GES = "models/20251228-ges"
@@ -901,7 +901,7 @@ def page_simulator():
             with e2:
                 type_energie_n2 = st.selectbox("Type énergie n°2", form_options["type_energie_n2"])
 
-        submitted = st.form_submit_button("🚀 Lancer la simulation", use_container_width=True)
+        submitted = st.form_submit_button("🚀 Lancer la prédiction", use_container_width=True)
 
     if submitted:
         # 🔥 IMPORTANT :
@@ -996,5 +996,5 @@ elif page == "📊 Dataviz":
     page_dataviz()
 elif page == "📈 Résultats d'entraînement":
     page_results()
-elif page == "🧮 Simulateur DPE":
+elif page == "🧮 Prédiction DPE":
     page_simulator()
