@@ -17,15 +17,51 @@ import torch.nn as nn
 from sklearn.base import BaseEstimator, TransformerMixin
 
 class DropColumns(BaseEstimator, TransformerMixin):
-    def __init__(self, cols):
-        self.cols = list(cols)
+    def __init__(self, cols=None):
+        # cols peut être None à cause d'anciens pickles
+        self.cols = list(cols) if cols is not None else []
+
+    def __setstate__(self, state):
+        """
+        Appelé par pickle/joblib au chargement.
+        On récupère les anciens noms d'attributs possibles.
+        """
+        self.__dict__.update(state)
+
+        # rétro-compat : si l'ancien objet n'avait pas "cols"
+        if not hasattr(self, "cols"):
+            for alt in ("columns", "to_drop", "drop_cols", "cols_to_drop", "columns_to_drop"):
+                if hasattr(self, alt):
+                    self.cols = list(getattr(self, alt))
+                    break
+            else:
+                self.cols = []
+
+        # sécurise le type
+        if self.cols is None:
+            self.cols = []
+        if not isinstance(self.cols, (list, tuple, set)):
+            self.cols = [self.cols]
+        self.cols = list(self.cols)
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
         X = X.copy()
-        return X.drop(columns=[c for c in self.cols if c in X.columns], errors="ignore")
+
+        cols = getattr(self, "cols", None)
+        if cols is None:
+            cols = []
+
+        # au cas où encore une autre version existait
+        if len(cols) == 0:
+            for alt in ("columns", "to_drop", "drop_cols", "cols_to_drop", "columns_to_drop"):
+                if hasattr(self, alt) and getattr(self, alt) is not None:
+                    cols = list(getattr(self, alt))
+                    break
+
+        return X.drop(columns=[c for c in cols if c in X.columns], errors="ignore")
 
 
 class OrdinalMapping(BaseEstimator, TransformerMixin):
