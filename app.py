@@ -473,7 +473,7 @@ def page_simulator():
 
     # Chemin vers ton pipeline joblib
     # -> adapte-le à ton projet
-    MODEL_PATH = "models/dpe_pipeline.joblib"
+    MODEL_PATH = "models/20251228-conso/preprocess.joblib"
 
     try:
         pipeline = load_pipeline(MODEL_PATH)
