@@ -853,7 +853,6 @@ def page_simulator():
     )
 
     with st.form("form_simulation"):
-        
         with st.container(border=True):
             st.markdown("**Caractéristiques du logement**")
             c1, c2, c3 = st.columns(3)
@@ -870,8 +869,7 @@ def page_simulator():
                 )
                 zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
             with c3:
-                periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
-                     
+                periode_construction = st.selectbox("Période construction", form_options["periode_construction"])                 
         with st.container(border=True):
             st.markdown("**Energies chauffage et ECS**")
             e1, e2, e3 = st.columns(3)
@@ -891,14 +889,13 @@ def page_simulator():
                 type_generateur_chauffage_principal_ecs = st.selectbox("Générateur chauffage principal ECS", form_options["type_generateur_chauffage_principal_ecs"])
         with st.container(border=True):
             st.markdown("**Isolation / inertie**")
-            i1, i2 = st.columns(3)
+            i1, i2 = st.columns(2)
             with i1:
                 qualite_isolation_enveloppe = st.selectbox("Qualité isolation enveloppe", form_options["qualite_isolation_enveloppe"], index=1)
                 qualite_isolation_murs = st.selectbox("Qualité isolation murs", form_options["qualite_isolation_murs"], index=1)
             with i2:
                 qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"], index=1)
                 classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"], index=1)
-            
         with st.expander("Énergies secondaires (optionnel)"):
             e1, e2 = st.columns(2)
             with e1:
