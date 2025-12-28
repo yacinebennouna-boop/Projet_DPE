@@ -113,7 +113,7 @@ L'application Streamlit est structurée en trois parties :
 
 Si vous souhaitez faire tourner le projet sur votre machine :
 
-    Cloner le dépôt :
+Cloner le dépôt :
 ```bash
 git clone [https://github.com/VOTRE-USER/VOTRE-REPO.git](https://github.com/VOTRE-USER/VOTRE-REPO.git)
 cd VOTRE-REPO
@@ -140,12 +140,12 @@ Lancer l'application :
 
 ## 👥 Auteurs
 
-Projet réalisé par l'équipe DataScientest :
+Projet réalisé par l'équipe :
 
-    [Aymane Karani]
+    - Aymane Karani
+	
+    - Dylan Nefnaf
 
-    [Dylan Nefnaf]
+    - Guillaume Deschamps
 
-    [Guillaume Deschamps]
-
-    [Yacine Bennouna]
+    - Yacine Bennouna
