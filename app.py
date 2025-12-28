@@ -725,11 +725,11 @@ def page_simulator():
     form_options = {
         "classe_altitude": [ "inférieur à 400m", "400-800m","supérieur à 800m"],
         "periode_construction": [
-            "1948-1974", "1975-1977", "1978-1982", "1983-1988", "1989-2000",
-            "2001-2005", "2006-2012", "2013-2021", "après 2021", "avant 1948"
+            "avant 1948", "1948-1974", "1975-1977", "1978-1982", "1983-1988", "1989-2000",
+            "2001-2005", "2006-2012", "2013-2021", "après 2021"
         ],
         "type_batiment": ["appartement", "maison"],
-        "type_installation_chauffage": ["individuel", "collectif","mixte (collectif-individuel)", "Vide"],
+        "type_installation_chauffage": ["individuel", "collectif","mixte (collectif-individuel)"],
         "type_installation_ecs": ["individuel", "collectif", "mixte (collectif-individuel)","INCONNU"],
         "zone_clim_simple": ["H1", "H2", "H3"],
         "type_energie_principale_chauffage": [
@@ -853,44 +853,52 @@ def page_simulator():
     )
 
     with st.form("form_simulation"):
-        c1, c2, c3 = st.columns(3)
+        
+        with st.container(border=True):
+            st.markdown("**Caractéristiques du logement**")
+            c1, c2, c3 = st.columns(3)
+            with c1:                   
+                type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"], index=1)                                  
+                classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"], index=0)
+            with c2:
+                surface_habitable_logement = st.number_input(
+                "Surface habitable (m²)",
+                min_value=9.0,
+                max_value=500.0,
+                value=80.0,
+                step=1.0
+                )
+                zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
+            with c3:
+                periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
+                     
+        with st.container(border=True):
+            st.markdown("**Energies chauffage et ECS**")
+            e1, e2, e3 = st.columns(3)
+            with e1:
+                type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"], index=0)
+                type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
+                type_installation_ecs = st.selectbox("Installation ECS", form_options["type_installation_ecs"], index=0)
 
-        with c1:
-            type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"], index=1)
-            surface_habitable_logement = st.number_input(
-            "Surface habitable (m²)",
-            min_value=9.0,
-            max_value=500.0,
-            value=80.0,
-            step=1.0
-            )
-            periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
-            classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"], index=0)
-            zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
-
-        with c2:
-            type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"], index=0)
-            valeur_par_defaut_type_energie_principale_chauffage = "Électricité"
-            # On cherche l'index dans la liste
-            default_index_type_energie_principale_chauffage = form_options["type_energie_principale_chauffage"].index(valeur_par_defaut_type_energie_principale_chauffage)
-            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"], index=default_index_type_energie_principale_chauffage)
-            type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
-            type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
-
-        with c3:
-            type_installation_ecs = st.selectbox("Installation ECS", form_options["type_installation_ecs"], index=0)
-            type_energie_principale_ecs = st.selectbox("Énergie principale ECS", form_options["type_energie_principale_ecs"])
-            type_generateur_chauffage_principal_ecs = st.selectbox("Générateur chauffage principal ECS", form_options["type_generateur_chauffage_principal_ecs"])
-
-        with st.expander("Isolation / inertie (utilisé par le modèle)"):
-            ic1, ic2 = st.columns(2)
-            with ic1:
+            with e2:
+                valeur_par_defaut_type_energie_principale_chauffage = "Électricité"
+                # On cherche l'index dans la liste
+                default_index_type_energie_principale_chauffage = form_options["type_energie_principale_chauffage"].index(valeur_par_defaut_type_energie_principale_chauffage)
+                type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"], index=default_index_type_energie_principale_chauffage)
+                type_energie_principale_ecs = st.selectbox("Énergie principale ECS", form_options["type_energie_principale_ecs"])
+            with e3:
+                type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
+                type_generateur_chauffage_principal_ecs = st.selectbox("Générateur chauffage principal ECS", form_options["type_generateur_chauffage_principal_ecs"])
+        with st.container(border=True):
+            st.markdown("**Isolation / inertie**")
+            i1, i2 = st.columns(3)
+            with i1:
                 qualite_isolation_enveloppe = st.selectbox("Qualité isolation enveloppe", form_options["qualite_isolation_enveloppe"], index=1)
                 qualite_isolation_murs = st.selectbox("Qualité isolation murs", form_options["qualite_isolation_murs"], index=1)
-            with ic2:
+            with i2:
                 qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"], index=1)
                 classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"], index=1)
-
+            
         with st.expander("Énergies secondaires (optionnel)"):
             e1, e2 = st.columns(2)
             with e1:
