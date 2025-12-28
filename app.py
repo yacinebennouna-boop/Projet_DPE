@@ -220,9 +220,9 @@ def load_model(path: Path):
 # ----------------------------
 # UI: Sidebar navigation
 # ----------------------------
-st.sidebar.title("Navigation")
+st.sidebar.title("Menu")
 page = st.sidebar.radio(
-    "Aller à :",
+    "Étapes :",
     [
         "🏁 Présentation",
         "📊 Dataviz",
@@ -232,7 +232,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Projet ML - Simulation DPE")
+st.sidebar.caption("Projet ML - Prédiction DPE")
 
 # ----------------------------
 # PAGE 1: Présentation
@@ -721,16 +721,15 @@ def page_simulator():
         )
         st.stop()
 
-    # ✅ options issues de ton training (tu peux garder celles que tu as déjà extraites)
-    # NB: j'utilise ici tes form_options "propres" (celles en bas de ton message)
+    # ✅ catégories issues de du training
     form_options = {
-        "classe_altitude": ["400-800m", "inférieur à 400m", "supérieur à 800m"],
+        "classe_altitude": [ "inférieur à 400m", "400-800m","supérieur à 800m"],
         "periode_construction": [
             "1948-1974", "1975-1977", "1978-1982", "1983-1988", "1989-2000",
             "2001-2005", "2006-2012", "2013-2021", "après 2021", "avant 1948"
         ],
         "type_batiment": ["appartement", "maison"],
-        "type_installation_chauffage": ["Vide", "collectif", "individuel", "mixte (collectif-individuel)"],
+        "type_installation_chauffage": ["individuel", "collectif","mixte (collectif-individuel)", "Vide"],
         "type_installation_ecs": ["INCONNU", "collectif", "individuel", "mixte (collectif-individuel)"],
         "zone_clim_simple": ["H1", "H2", "H3"],
         "type_energie_principale_chauffage": [
@@ -838,7 +837,7 @@ def page_simulator():
             "Chaudière gaz à condensation après 2015",
             "Vide",
         ],
-        # ⚠️ Ces 4-là sont dans col_oe => ordinal_map => ce sont bien des inputs à fournir !
+        # ⚠️ Ces 4-là sont dans col_oe => ordinal_map 
         "qualite_isolation_enveloppe": ["insuffisante", "moyenne", "bonne", "très bonne"],
         "qualite_isolation_murs": ["insuffisante", "moyenne", "bonne", "très bonne"],
         "qualite_isolation_plancher_haut": ["insuffisante", "moyenne", "bonne", "très bonne"],
@@ -857,20 +856,20 @@ def page_simulator():
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"])
+            type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"], index=1)
             surface_habitable_logement = st.number_input(
             "Surface habitable (m²)",
             min_value=9.0,
             max_value=500.0,
-            value=70.0,
+            value=80.0,
             step=1.0
             )
             periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
-            classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"])
+            classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"], index=0)
             zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
 
         with c2:
-            type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"])
+            type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"], index=0)
             type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"])
             type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
             type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
@@ -883,11 +882,11 @@ def page_simulator():
         with st.expander("Isolation / inertie (utilisé par le modèle)"):
             ic1, ic2 = st.columns(2)
             with ic1:
-                qualite_isolation_enveloppe = st.selectbox("Qualité isolation enveloppe", form_options["qualite_isolation_enveloppe"])
-                qualite_isolation_murs = st.selectbox("Qualité isolation murs", form_options["qualite_isolation_murs"])
+                qualite_isolation_enveloppe = st.selectbox("Qualité isolation enveloppe", form_options["qualite_isolation_enveloppe"], index=1)
+                qualite_isolation_murs = st.selectbox("Qualité isolation murs", form_options["qualite_isolation_murs"], index=1)
             with ic2:
-                qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"])
-                classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"])
+                qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"], index=1)
+                classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"], index=1)
 
         with st.expander("Énergies secondaires (optionnel)"):
             e1, e2 = st.columns(2)
@@ -975,11 +974,11 @@ def page_simulator():
             base_url = "https://www.outils.immo/outils-immo.php"
             params = (
                 f"?type=dpe&modele=2021&valeur={int(round(conso_pred))}"
-                f"&lettre={classe_finale}&valeurges={ges_pred}"
+                f"&lettre={classe_finale}&valeurges={int(round(ges_pred))}"
             )
             st.image(base_url + params, use_container_width=True)
 
-        st.success("Simulation terminée (Conso via modèle, GES via modèle).")
+        st.success("Prédiction terminée")
         with st.expander("🔎 Données envoyées au modèle (debug)"):
             st.json(raw_features)
 
