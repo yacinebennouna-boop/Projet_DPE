@@ -3,7 +3,7 @@ pandas
 numpy
 altair
 joblib
-scikit-learn
+scikit-learn==1.6.1
 plotly
 matplotlib
 torch
