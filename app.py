@@ -768,11 +768,12 @@ def page_simulator():
             "Gaz naturel",
             "Propane",
             "Réseau de Chauffage urbain",
-            "Vide",
             "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
+            "Vide",
         ],
         "type_energie_n1": [
+            "Électricité",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
             "Bois – Plaquettes d’industrie",
@@ -784,7 +785,6 @@ def page_simulator():
             "Gaz naturel",
             "Propane",
             "Réseau de Chauffage urbain",
-            "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
         ],
         "type_energie_n2": [
@@ -804,6 +804,7 @@ def page_simulator():
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
         ],
         "type_energie_principale_ecs": [
+            "Électricité",
             "Butane",
             "Charbon",
             "Fioul domestique",
@@ -811,7 +812,6 @@ def page_simulator():
             "Gaz naturel",
             "Propane",
             "Réseau de Chauffage urbain",
-            "Électricité",
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
