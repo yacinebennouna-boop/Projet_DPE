@@ -7,7 +7,6 @@ import joblib
 from pathlib import Path
 import os
 import plotly.express as px
-import random
 import torch
 import torch.nn as nn
 
@@ -666,7 +665,8 @@ def load_artifacts(artifact_dir: str):
     return preprocess, y_scaler, model
 
 
-def predict_conso(preprocess, y_scaler, model, raw_features: dict) -> float:
+# récupérer la prédiction à partir du modèle : idem conso ou ges :
+def predict_from_model(preprocess, y_scaler, model, raw_features: dict) -> float:
     """
     raw_features : dict avec les COLONNES BRUTES (avant preprocess)
     """
@@ -696,13 +696,24 @@ def predict_conso(preprocess, y_scaler, model, raw_features: dict) -> float:
 def page_simulator():
     st.title("🏗️ Simulateur de Performance Énergétique")
 
-    ARTIFACT_DIR = "models/20251228-conso"
+    ARTIFACT_DIR_CONSO = "models/20251228-conso"
+    ARTIFACT_DIR_GES = "models/20251228-ges"
 
     try:
-        preprocess, y_scaler, model = load_artifacts(ARTIFACT_DIR)
+        preprocess_conso, y_scaler_conso, model_conso = load_artifacts(ARTIFACT_DIR_CONSO)
     except Exception as e:
         st.error(
-            f"Impossible de charger les artefacts depuis `{ARTIFACT_DIR}`.\n\n"
+            f"Impossible de charger les artefacts depuis `{ARTIFACT_DIR_CONSO}`.\n\n"
+            f"Attendus : preprocess.joblib, y_scaler.joblib, model.pt\n\n"
+            f"Détail : {e}"
+        )
+        st.stop()
+    
+    try:
+        preprocess_ges, y_scaler_ges, model_ges = load_artifacts(ARTIFACT_DIR_GES)
+    except Exception as e:
+        st.error(
+            f"Impossible de charger les artefacts depuis `{ARTIFACT_DIR_GES}`.\n\n"
             f"Attendus : preprocess.joblib, y_scaler.joblib, model.pt\n\n"
             f"Détail : {e}"
         )
@@ -836,7 +847,7 @@ def page_simulator():
         """
         Remplissez les caractéristiques du logement.
         - **Consommation** : prédite par le modèle PyTorch.
-        - **GES** : simulé (random).
+        - **GES** : prédit par le modèle PyTorch.
         """
     )
 
@@ -913,21 +924,27 @@ def page_simulator():
             "classe_inertie_batiment": classe_inertie_batiment,
         }
 
+        # conso à partir du modele
         try:
-            conso_pred = predict_conso(preprocess, y_scaler, model, raw_features)
+            conso_pred = predict_from_model(preprocess_conso, y_scaler_conso, model_conso, raw_features)
         except Exception as e:
             st.error(
                 "Erreur pendant la prédiction.\n\n"
-                "Cause la plus fréquente : il manque des colonnes attendues par le preprocess "
-                "(car tu utilises cat_selector/num_selector à l'entraînement).\n\n"
                 f"Détail : {e}"
             )
             st.stop()
 
-        # GES random (comme demandé)
-        ges_simule = random.randint(2, 68)
+        # GES à partir du modèle :
+        try:
+            ges_pred = predict_from_model(preprocess_ges, y_scaler_ges, model_ges, raw_features)
+        except Exception as e:
+            st.error(
+                "Erreur pendant la prédiction.\n\n"
+                f"Détail : {e}"
+            )
+            st.stop()
 
-        classe_finale = get_classe_dpe(conso_pred, ges_simule)
+        classe_finale = get_classe_dpe(conso_pred, ges_pred)
 
         st.divider()
         st.header("Résultats de l'estimation")
@@ -936,7 +953,7 @@ def page_simulator():
 
         with col_res1:
             st.metric("Consommation (Ep)", f"{conso_pred:.0f} kWh/m²/an")
-            st.metric("Émissions (GES)", f"{ges_simule} kgCO₂/m²/an")
+            st.metric("Émissions (GES)", f"{ges_pred} kgCO2/m²/an")
 
             color_map = {
                 "A": "#009036", "B": "#53af31", "C": "#c6d300", "D": "#fce600",
@@ -960,7 +977,7 @@ def page_simulator():
             )
             st.image(base_url + params, use_container_width=True)
 
-        st.success("Simulation terminée (Conso via modèle, GES random).")
+        st.success("Simulation terminée (Conso via modèle, GES via modèle).")
         with st.expander("🔎 Données envoyées au modèle (debug)"):
             st.json(raw_features)
 
