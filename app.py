@@ -397,127 +397,360 @@ def page_results():
             st.warning("⚠️ Image 'img/loss_batch_size.png' introuvable.")
 
 # ----------------------------
-# PAGE 4: Simulateur (Formulaire + Modèle)
+# LOGIQUE METIER (Calcul du DPE)
 # ----------------------------
-# --- LOGIQUE MÉTIER (Calcul du DPE) ---
 def get_classe_dpe(conso, ges):
     """
-    Calcule l'étiquette DPE selon la méthode du double seuil (2021).
-    On prend la pire note entre la Conso et le GES.
+    Méthode du double seuil (2021) : on prend la pire note entre Conso et GES.
     """
-    # Seuils officiels DPE [Conso, GES]
     seuils = {
-        'A': [70, 6],
-        'B': [110, 11],
-        'C': [180, 30],
-        'D': [250, 50],
-        'E': [330, 70],
-        'F': [420, 100],
-        'G': [float('inf'), float('inf')]
+        "A": [70, 6],
+        "B": [110, 11],
+        "C": [180, 30],
+        "D": [250, 50],
+        "E": [330, 70],
+        "F": [420, 100],
+        "G": [float("inf"), float("inf")],
     }
-    
-    def get_letter(val, type_val):
-        idx = 0 if type_val == 'conso' else 1
+
+    def get_letter(val, idx):
         for letter, limits in seuils.items():
             if val < limits[idx]:
                 return letter
-        return 'G'
+        return "G"
 
-    letter_c = get_letter(conso, 'conso')
-    letter_g = get_letter(ges, 'ges')
-    
-    # Ordre de grandeur pour comparer les lettres (A=1, B=2...)
+    letter_c = get_letter(conso, 0)
+    letter_g = get_letter(ges, 1)
+
     order = "ABCDEFG"
+    # "pire" = lettre plus loin dans l'alphabet
     return letter_c if order.index(letter_c) > order.index(letter_g) else letter_g
 
-# --- PAGE STREAMLIT ---
+
+# ----------------------------
+# CHARGEMENT MODELE
+# ----------------------------
+@st.cache_resource
+def load_pipeline(model_path: str):
+    """
+    Charge ton pipeline sklearn (préprocess + modèle) depuis un .joblib
+    """
+    return joblib.load(model_path)
+
+
+def predict_conso(pipeline, features: dict) -> float:
+    """
+    features: dict {col: value} avec EXACTEMENT les colonnes attendues
+    Retourne une conso prédite (float).
+    """
+    X = pd.DataFrame([features])
+
+    # Sécurités simples
+    # - évite NaN surprise
+    X = X.fillna("Vide")
+
+    y_pred = pipeline.predict(X)
+
+    # y_pred peut être array([val]) ou liste
+    conso = float(np.ravel(y_pred)[0])
+
+    # Optionnel : borner et arrondir pour un rendu UI propre
+    conso = max(0.0, conso)
+    return conso
+
+
+# ----------------------------
+# PAGE STREAMLIT
+# ----------------------------
 def page_simulator():
     st.title("🏗️ Simulateur de Performance Énergétique")
-    st.markdown("""
-    Remplissez les caractéristiques du logement pour estimer sa consommation et son étiquette DPE.
-    *Note : Ceci est une maquette, les résultats sont simulés.*
-    """)
+    st.markdown(
+        """
+        Remplissez les caractéristiques du logement pour estimer sa consommation et son étiquette DPE.
+        *Note : la consommation est prédite par le modèle, les GES sont simulés (random).*
+        """
+    )
+
+    # Chemin vers ton pipeline joblib
+    # -> adapte-le à ton projet
+    MODEL_PATH = "models/dpe_pipeline.joblib"
+
+    try:
+        pipeline = load_pipeline(MODEL_PATH)
+    except Exception as e:
+        st.error(
+            f"Impossible de charger le modèle depuis `{MODEL_PATH}`.\n\n"
+            f"Détail : {e}"
+        )
+        st.stop()
+
+    # Options EXACTES issues de ton training (celles que tu as listées)
+    form_options = {
+        "type_batiment": ["appartement", "maison"],
+        "periode_construction": [
+            "1948-1974",
+            "1975-1977",
+            "1978-1982",
+            "1983-1988",
+            "1989-2000",
+            "2001-2005",
+            "2006-2012",
+            "2013-2021",
+            "après 2021",
+            "avant 1948",
+        ],
+        "type_installation_chauffage": [
+            "Vide",
+            "collectif",
+            "individuel",
+            "mixte (collectif-individuel)",
+        ],
+        "classe_altitude": ["400-800m", "inférieur à 400m", "supérieur à 800m"],
+        "type_energie_principale_chauffage": [
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
+        "type_emetteur_installation_chauffage_n1": [
+            "Autres",
+            "Convecteur électrique NFC  NF** et NF***",
+            "Panneau rayonnant NFC  NF** et NF***",
+            "Radiateur bitube avec robinet thermostatique sur réseau individuel eau chaude basse ou moyenne température(inf 65°C)",
+            "Radiateur bitube avec robinet thermostatique sur réseau individuel eau chaude haute température(sup ou egal 65°C)",
+            "Vide",
+            "radiateur électrique NFC  NF** et NF***",
+        ],
+        "type_energie_generateur_n1_ecs_n1": [
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Vide",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
+        "type_energie_n1": [
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
+        "type_energie_principale_ecs": [
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Non affecté",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
+        "type_installation_ecs": ["INCONNU", "collectif", "individuel", "mixte (collectif-individuel)"],
+        "type_generateur_chauffage_principal": [
+            "Autres",
+            "Chaudière gaz à condensation 2001-2015",
+            "Chaudière gaz à condensation après 2015",
+            "Convecteur électrique NFC  NF** et NF***",
+            "Panneau rayonnant électrique NFC  NF** et NF***",
+            "Radiateur électrique à accumulation",
+            "Réseau de chaleur isolé",
+            "Vide",
+        ],
+        "type_generateur_chauffage_principal_ecs": [
+            "Autres",
+            "Ballon électrique à accumulation vertical Autres ou inconnue",
+            "Ballon électrique à accumulation vertical Catégorie B ou 2 étoiles",
+            "Chaudière gaz à condensation 2001-2015",
+            "Chaudière gaz à condensation après 2015",
+            "Vide",
+        ],
+        "type_energie_n2": [
+            "AUCUN",
+            "Bois – Bûches",
+            "Bois – Granulés (pellets) ou briquettes",
+            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes forestières",
+            "Butane",
+            "Charbon",
+            "Fioul domestique",
+            "GPL",
+            "Gaz naturel",
+            "Propane",
+            "Réseau de Chauffage urbain",
+            "Électricité",
+            "Électricité d'origine renouvelable utilisée dans le bâtiment",
+        ],
+        "zone_clim_simple": ["H1", "H2", "H3"],
+    }
 
     with st.form("form_simulation"):
-        st.subheader("1. Caractéristiques du Bâtiment")
-        
-        # Organisation en 3 colonnes pour compacter l'affichage
+        st.subheader("1. Caractéristiques utilisées par le modèle")
+
         c1, c2, c3 = st.columns(3)
-        
+
         with c1:
-            type_bat = st.selectbox("Type de bâtiment", ["Maison", "Appartement", "Immeuble"])
-            surface = st.number_input("Surface habitable (m²)", min_value=9.0, max_value=500.0, value=70.0, step=1.0)
-            periode = st.selectbox("Période de construction", ["Avant 1948", "1949-1974", "1975-1988", "1989-1999", "2000-2005", "2006-2012", "Après 2013"])
-            altitude = st.selectbox("Classe d'altitude", ["< 400m", "400-800m", "> 800m"])
-            zone_clim = st.selectbox("Zone Climatique", ["H1", "H2", "H3"])
+            type_batiment = st.selectbox("Type de bâtiment", form_options["type_batiment"])
+            periode_construction = st.selectbox("Période de construction", form_options["periode_construction"])
+            classe_altitude = st.selectbox("Classe d'altitude", form_options["classe_altitude"])
+            zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
 
         with c2:
-            inertie = st.selectbox("Inertie du bâtiment", ["Très légère", "Légère", "Moyenne", "Lourde", "Très lourde"])
-            iso_mur = st.selectbox("Isolation Murs", ["Inconnue", "Non isolé", "Moyenne", "Bonne", "Très bonne"])
-            iso_toit = st.selectbox("Isolation Plancher Haut", ["Inconnue", "Non isolé", "Moyenne", "Bonne", "Très bonne"])
-            iso_env = st.selectbox("Qualité Isolation Enveloppe", ["Insuffisante", "Moyenne", "Bonne", "Très bonne"])
+            type_installation_chauffage = st.selectbox(
+                "Type installation chauffage",
+                form_options["type_installation_chauffage"],
+            )
+            type_energie_principale_chauffage = st.selectbox(
+                "Énergie principale chauffage",
+                form_options["type_energie_principale_chauffage"],
+            )
+            type_generateur_chauffage_principal = st.selectbox(
+                "Générateur chauffage principal",
+                form_options["type_generateur_chauffage_principal"],
+            )
 
         with c3:
-            # Placeholders pour les systèmes (à remplacer par tes listes complètes plus tard)
-            chauffage_type = st.selectbox("Type installation chauffage", ["Individuel", "Collectif"])
-            generateur_chauff = st.selectbox("Générateur chauffage principal", ["Chaudière gaz standard", "Chaudière condensation", "PAC air/eau", "Radiateur élec", "Poêle bois"])
-            energie_chauff = st.selectbox("Énergie chauffage principale", ["Électricité", "Gaz naturel", "Fioul", "Bois", "Réseau de chaleur"])
-            emetteur = st.selectbox("Type émetteur", ["Radiateur bitube", "Radiateur monotube", "Plancher chauffant"])
-            ecs_type = st.selectbox("Type installation ECS", ["Individuel", "Collectif"])
-            energie_ecs = st.selectbox("Énergie ECS", ["Électricité", "Gaz", "Fioul"])
+            type_emetteur_installation_chauffage_n1 = st.selectbox(
+                "Type émetteur chauffage (n1)",
+                form_options["type_emetteur_installation_chauffage_n1"],
+            )
+            type_installation_ecs = st.selectbox(
+                "Type installation ECS",
+                form_options["type_installation_ecs"],
+            )
+            type_energie_principale_ecs = st.selectbox(
+                "Énergie principale ECS",
+                form_options["type_energie_principale_ecs"],
+            )
 
-        # Champs techniques supplémentaires (Repliés pour ne pas surcharger si moins importants)
-        with st.expander("Paramètres avancés (Énergies secondaires)"):
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                st.selectbox("Type énergie n°1", ["Aucune", "Électricité", "Gaz"], key="e1")
-                st.selectbox("Type énergie générateur n°1 ECS", ["Aucune", "Électricité", "Gaz"], key="e1_ecs")
-            with sc2:
-                st.selectbox("Type énergie n°2", ["Aucune", "Bois", "Solaire"], key="e2")
-                st.selectbox("Générateur chauffage principal ECS", ["Indépendant", "Combiné"], key="gen_ecs")
+        with st.expander("Paramètres avancés (énergies secondaires / détails ECS)"):
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                type_energie_n1 = st.selectbox("Type énergie n°1", form_options["type_energie_n1"])
+                type_energie_generateur_n1_ecs_n1 = st.selectbox(
+                    "Type énergie générateur n°1 ECS (n1)",
+                    form_options["type_energie_generateur_n1_ecs_n1"],
+                )
+            with ac2:
+                type_energie_n2 = st.selectbox("Type énergie n°2", form_options["type_energie_n2"])
+                type_generateur_chauffage_principal_ecs = st.selectbox(
+                    "Générateur chauffage principal ECS",
+                    form_options["type_generateur_chauffage_principal_ecs"],
+                )
 
-        # Bouton de soumission centré
         submitted = st.form_submit_button("🚀 Lancer la simulation", use_container_width=True)
 
-    # --- RÉSULTATS ---
     if submitted:
-        # Simulation Aléatoire (Mock)
-        conso_simulee = random.randint(5, 398)
+        # ✅ Construction EXACTE des features attendues par le modèle
+        features = {
+            "type_batiment": type_batiment,
+            "periode_construction": periode_construction,
+            "type_installation_chauffage": type_installation_chauffage,
+            "classe_altitude": classe_altitude,
+            "type_energie_principale_chauffage": type_energie_principale_chauffage,
+            "type_emetteur_installation_chauffage_n1": type_emetteur_installation_chauffage_n1,
+            "type_energie_generateur_n1_ecs_n1": type_energie_generateur_n1_ecs_n1,
+            "type_energie_n1": type_energie_n1,
+            "type_energie_principale_ecs": type_energie_principale_ecs,
+            "type_installation_ecs": type_installation_ecs,
+            "type_generateur_chauffage_principal": type_generateur_chauffage_principal,
+            "type_generateur_chauffage_principal_ecs": type_generateur_chauffage_principal_ecs,
+            "type_energie_n2": type_energie_n2,
+            "zone_clim_simple": zone_clim_simple,
+        }
+
+        # ✅ conso via modèle
+        try:
+            conso_pred = predict_conso(pipeline, features)
+        except Exception as e:
+            st.error(
+                "Erreur pendant la prédiction du modèle. "
+                "Vérifie que les noms de colonnes et les modalités correspondent à l'entraînement.\n\n"
+                f"Détail : {e}"
+            )
+            st.stop()
+
+        # ✅ GES en random (comme demandé)
         ges_simule = random.randint(2, 68)
-        classe_finale = get_classe_dpe(conso_simulee, ges_simule)
+
+        # ✅ Classe DPE (double seuil)
+        classe_finale = get_classe_dpe(conso_pred, ges_simule)
 
         st.divider()
         st.header("Résultats de l'estimation")
 
-        # Affichage metrics
         col_res1, col_res2 = st.columns([1, 2])
 
         with col_res1:
             st.markdown("### Indicateurs")
-            st.metric("Consommation (Ep)", f"{conso_simulee} kWh/m²/an")
+            st.metric("Consommation (Ep)", f"{conso_pred:.0f} kWh/m²/an")
             st.metric("Émissions (GES)", f"{ges_simule} kgCO₂/m²/an")
-            
-            # Affichage de la lettre en gros (CSS hack rapide pour le style)
-            color_map = {'A': '#009036', 'B': '#53af31', 'C': '#c6d300', 'D': '#fce600', 'E': '#fbba00', 'F': '#eb6105', 'G': '#d40f14'}
-            st.markdown(f"""
-            <div style="text-align: center; background-color: {color_map[classe_finale]}; padding: 10px; border-radius: 10px;">
-                <h1 style="color: white; margin:0;">CLASSE {classe_finale}</h1>
-            </div>
-            """, unsafe_allow_html=True)
+
+            color_map = {
+                "A": "#009036",
+                "B": "#53af31",
+                "C": "#c6d300",
+                "D": "#fce600",
+                "E": "#fbba00",
+                "F": "#eb6105",
+                "G": "#d40f14",
+            }
+            st.markdown(
+                f"""
+                <div style="text-align: center; background-color: {color_map[classe_finale]};
+                            padding: 10px; border-radius: 10px;">
+                    <h1 style="color: white; margin:0;">CLASSE {classe_finale}</h1>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         with col_res2:
             st.markdown("### Étiquette Officielle")
-            # Construction de l'URL pour l'image dynamique
             base_url = "https://www.outils.immo/outils-immo.php"
-            params = f"?type=dpe&modele=2021&valeur={conso_simulee}&lettre={classe_finale}&valeurges={ges_simule}"
+            params = (
+                f"?type=dpe&modele=2021&valeur={int(round(conso_pred))}"
+                f"&lettre={classe_finale}&valeurges={ges_simule}"
+            )
             full_url = base_url + params
-            
-            # Affichage de l'image
-            st.image(full_url, caption=f"DPE généré pour {conso_simulee} kWh et {ges_simule} kgCO₂", use_container_width=True)
+            st.image(
+                full_url,
+                caption=f"DPE généré pour {conso_pred:.0f} kWh et {ges_simule} kgCO₂",
+                use_container_width=True,
+            )
 
-        st.success("Simulation terminée avec succès (Données aléatoires).")
-
-
+        st.success("Simulation terminée avec succès (Conso via modèle, GES aléatoire).")
 
 # ----------------------------
 # ROUTER
