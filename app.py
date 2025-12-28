@@ -356,10 +356,12 @@ def page_presentation():
         """)
         
         st.caption("Données sous Licence Ouverte / Open Licence version 2.0 - Producteur : ADEME")
+        
+        
+        
 # ----------------------------
 # PAGE 2: Dataviz
 # ----------------------------
-
 
 def display_img(filename, caption=""):
     """Fonction utilitaire pour gérer l'affichage sécurisé des images"""
@@ -953,7 +955,7 @@ def page_simulator():
 
         with col_res1:
             st.metric("Consommation (Ep)", f"{conso_pred:.0f} kWh/m²/an")
-            st.metric("Émissions (GES)", f"{ges_pred} kgCO2/m²/an")
+            st.metric("Émissions (GES)", f"{ges_pred:.0f} kgCO2/m²/an")
 
             color_map = {
                 "A": "#009036", "B": "#53af31", "C": "#c6d300", "D": "#fce600",
@@ -973,7 +975,7 @@ def page_simulator():
             base_url = "https://www.outils.immo/outils-immo.php"
             params = (
                 f"?type=dpe&modele=2021&valeur={int(round(conso_pred))}"
-                f"&lettre={classe_finale}&valeurges={ges_simule}"
+                f"&lettre={classe_finale}&valeurges={ges_pred}"
             )
             st.image(base_url + params, use_container_width=True)
 
