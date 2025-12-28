@@ -730,7 +730,7 @@ def page_simulator():
         ],
         "type_batiment": ["appartement", "maison"],
         "type_installation_chauffage": ["individuel", "collectif","mixte (collectif-individuel)", "Vide"],
-        "type_installation_ecs": ["INCONNU", "collectif", "individuel", "mixte (collectif-individuel)"],
+        "type_installation_ecs": ["individuel", "collectif", "mixte (collectif-individuel)","INCONNU"],
         "zone_clim_simple": ["H1", "H2", "H3"],
         "type_energie_principale_chauffage": [
             "Bois – Bûches",
@@ -870,12 +870,17 @@ def page_simulator():
 
         with c2:
             type_installation_chauffage = st.selectbox("Installation chauffage", form_options["type_installation_chauffage"], index=0)
-            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", form_options["type_energie_principale_chauffage"])
+            valeur_par_defaut_type_energie_principale_chauffage = "Électricité"
+            # On cherche l'index de "Cerise" dans la liste
+            default_index_type_energie_principale_chauffage = form_options["type_energie_principale_chauffage"].index(valeur_par_defaut_type_energie_principale_chauffage)
+            type_energie_principale_chauffage = st.selectbox("Énergie principale chauffage", 
+            form_options["type_energie_principale_chauffage"],
+            index=default_index_type_energie_principale_chauffage)
             type_generateur_chauffage_principal = st.selectbox("Générateur chauffage principal", form_options["type_generateur_chauffage_principal"])
             type_emetteur_installation_chauffage_n1 = st.selectbox("Émetteur chauffage", form_options["type_emetteur_installation_chauffage_n1"])
 
         with c3:
-            type_installation_ecs = st.selectbox("Installation ECS", form_options["type_installation_ecs"])
+            type_installation_ecs = st.selectbox("Installation ECS", form_options["type_installation_ecs"], index=0)
             type_energie_principale_ecs = st.selectbox("Énergie principale ECS", form_options["type_energie_principale_ecs"])
             type_generateur_chauffage_principal_ecs = st.selectbox("Générateur chauffage principal ECS", form_options["type_generateur_chauffage_principal_ecs"])
 
