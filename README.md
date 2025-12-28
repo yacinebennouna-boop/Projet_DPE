@@ -3,7 +3,7 @@
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://projetdpe.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Scikit-Learn](https://img.shields.io/badge/Library-Scikit--Learn-orange)
-![TensorFlow](https://img.shields.io/badge/Library-TensorFlow-orange)
+![PyTorch](https://img.shields.io/badge/Library-PyTorch-orange)
 ![Status](https://img.shields.io/badge/Status-Completed-green)
 
 > **Projet fil rouge réalisé dans le cadre de la formation Data Scientist chez [DataScientest](https://datascientest.com/).**
