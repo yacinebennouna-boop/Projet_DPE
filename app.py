@@ -382,7 +382,7 @@ def page_dataviz():
         "🌍 Panorama National", 
         "🗺️ Géographie & Climat", 
         "🏗️ Caractéristiques Bâti", 
-        "⏳ Temps & Surface"
+        "⏳ Période construction & Surface"
     ])
 
     # --- ONGLET 1 : PANORAMA NATIONAL ---
@@ -448,7 +448,7 @@ def page_dataviz():
         st.markdown("L'inertie thermique joue un rôle clé dans le confort et la performance.")
         display_img("repartition_classe_inertie_batiment.png", "Classement selon l'inertie")
 
-    # --- ONGLET 4 : TEMPS ET SURFACE ---
+    # --- ONGLET 4 : année construction ET SURFACE ---
     with tab4:
         st.header("Construction et Dimensions")
 
@@ -845,6 +845,13 @@ def page_simulator():
 
         with c1:
             type_batiment = st.selectbox("Type bâtiment", form_options["type_batiment"])
+            surface_habitable_logement = st.number_input(
+            "Surface habitable (m²)",
+            min_value=9.0,
+            max_value=500.0,
+            value=70.0,
+            step=1.0
+            )
             periode_construction = st.selectbox("Période construction", form_options["periode_construction"])
             classe_altitude = st.selectbox("Classe altitude", form_options["classe_altitude"])
             zone_clim_simple = st.selectbox("Zone climatique", form_options["zone_clim_simple"])
@@ -886,6 +893,7 @@ def page_simulator():
         raw_features = {
             "type_batiment": type_batiment,
             "periode_construction": periode_construction,
+            "surface_habitable_logement": float(surface_habitable_logement),
             "type_installation_chauffage": type_installation_chauffage,
             "classe_altitude": classe_altitude,
             "type_energie_principale_chauffage": type_energie_principale_chauffage,
