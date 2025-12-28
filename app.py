@@ -65,35 +65,107 @@ class DropColumns(BaseEstimator, TransformerMixin):
 
 
 class OrdinalMapping(BaseEstimator, TransformerMixin):
-    def __init__(self, cols, mapping, dropna=False):
-        self.cols = list(cols)
-        self.mapping = dict(mapping)
+    def __init__(self, cols=None, mapping=None, dropna=False):
+        self.cols = list(cols) if cols is not None else []
+        self.mapping = dict(mapping) if mapping is not None else {}
         self.dropna = dropna
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+        # --- rétro-compat pour cols ---
+        if not hasattr(self, "cols"):
+            for alt in ("columns", "col_oe", "ordinal_cols", "cols_to_map", "features"):
+                if hasattr(self, alt):
+                    self.cols = list(getattr(self, alt))
+                    break
+            else:
+                self.cols = []
+
+        # --- rétro-compat pour mapping ---
+        if not hasattr(self, "mapping"):
+            for alt in ("map", "mapper", "mapping_dict", "mappings"):
+                if hasattr(self, alt):
+                    self.mapping = dict(getattr(self, alt))
+                    break
+            else:
+                self.mapping = {}
+
+        # --- rétro-compat pour dropna ---
+        if not hasattr(self, "dropna"):
+            for alt in ("drop_na", "drop_nan", "drop_missing"):
+                if hasattr(self, alt):
+                    self.dropna = bool(getattr(self, alt))
+                    break
+            else:
+                self.dropna = False
+
+        # sécurise types
+        if self.cols is None:
+            self.cols = []
+        if not isinstance(self.cols, (list, tuple, set)):
+            self.cols = [self.cols]
+        self.cols = list(self.cols)
+
+        if self.mapping is None:
+            self.mapping = {}
+        if not isinstance(self.mapping, dict):
+            self.mapping = dict(self.mapping)
+
+        self.dropna = bool(self.dropna)
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
         X = X.copy()
-        for c in self.cols:
+
+        cols = getattr(self, "cols", []) or []
+        mapping = getattr(self, "mapping", {}) or {}
+        dropna = bool(getattr(self, "dropna", False))
+
+        for c in cols:
             if c in X.columns:
-                X[c] = X[c].map(self.mapping)
-                if not self.dropna:
-                    # si valeur inconnue -> NaN, on laisse, l'imputer num s'en charge
-                    pass
+                X[c] = X[c].map(mapping)
+                # on laisse les NaN -> imputés par la branche "num" ensuite
+                if dropna:
+                    X = X.dropna(subset=[c])
+
         return X
 
 
 class RareCategoryGrouper(BaseEstimator, TransformerMixin):
-    """
-    Groupe les catégories rares en 'Autres' (ou 'Vide' si NaN).
-    threshold = fréquence minimale (ex: 0.07)
-    """
-    def __init__(self, cols, threshold=0.07, other_label="Autres"):
-        self.cols = list(cols)
+    def __init__(self, cols=None, threshold=0.07, other_label="Autres"):
+        self.cols = list(cols) if cols is not None else []
         self.threshold = float(threshold)
         self.other_label = other_label
         self.keep_values_ = {}
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+        if not hasattr(self, "cols"):
+            for alt in ("columns", "cat_cols", "cols_to_group", "features"):
+                if hasattr(self, alt):
+                    self.cols = list(getattr(self, alt))
+                    break
+            else:
+                self.cols = []
+
+        if not hasattr(self, "threshold"):
+            self.threshold = 0.07
+        if not hasattr(self, "other_label"):
+            self.other_label = "Autres"
+        if not hasattr(self, "keep_values_"):
+            self.keep_values_ = {}
+
+        if self.cols is None:
+            self.cols = []
+        if not isinstance(self.cols, (list, tuple, set)):
+            self.cols = [self.cols]
+        self.cols = list(self.cols)
+
+        self.threshold = float(self.threshold)
 
     def fit(self, X, y=None):
         X = X.copy()
@@ -116,6 +188,7 @@ class RareCategoryGrouper(BaseEstimator, TransformerMixin):
             s = X[c].fillna("Vide")
             X[c] = s.where(s.isin(keep), other=self.other_label)
         return X
+
 
 
 
