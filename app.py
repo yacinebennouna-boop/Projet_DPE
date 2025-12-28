@@ -12,6 +12,80 @@ import torch
 import torch.nn as nn
 
 
+
+# preprocessing_custom
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class DropColumns(BaseEstimator, TransformerMixin):
+    def __init__(self, cols):
+        self.cols = list(cols)
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        return X.drop(columns=[c for c in self.cols if c in X.columns], errors="ignore")
+
+
+class OrdinalMapping(BaseEstimator, TransformerMixin):
+    def __init__(self, cols, mapping, dropna=False):
+        self.cols = list(cols)
+        self.mapping = dict(mapping)
+        self.dropna = dropna
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        for c in self.cols:
+            if c in X.columns:
+                X[c] = X[c].map(self.mapping)
+                if not self.dropna:
+                    # si valeur inconnue -> NaN, on laisse, l'imputer num s'en charge
+                    pass
+        return X
+
+
+class RareCategoryGrouper(BaseEstimator, TransformerMixin):
+    """
+    Groupe les catégories rares en 'Autres' (ou 'Vide' si NaN).
+    threshold = fréquence minimale (ex: 0.07)
+    """
+    def __init__(self, cols, threshold=0.07, other_label="Autres"):
+        self.cols = list(cols)
+        self.threshold = float(threshold)
+        self.other_label = other_label
+        self.keep_values_ = {}
+
+    def fit(self, X, y=None):
+        X = X.copy()
+        self.keep_values_ = {}
+        n = len(X)
+        for c in self.cols:
+            if c not in X.columns:
+                continue
+            vc = X[c].fillna("Vide").value_counts(dropna=False)
+            freq = vc / max(n, 1)
+            self.keep_values_[c] = set(freq[freq >= self.threshold].index.tolist())
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        for c in self.cols:
+            if c not in X.columns:
+                continue
+            keep = self.keep_values_.get(c, set())
+            s = X[c].fillna("Vide")
+            X[c] = s.where(s.isin(keep), other=self.other_label)
+        return X
+
+
+
+
+
+
 # ----------------------------
 # CONFIG
 # ----------------------------
