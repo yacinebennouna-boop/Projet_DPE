@@ -895,11 +895,11 @@ def page_simulator():
                 qualite_isolation_plancher_haut = st.selectbox("Qualité isolation plancher haut", form_options["qualite_isolation_plancher_haut"], index=1)
                 classe_inertie_batiment = st.selectbox("Classe inertie bâtiment", form_options["classe_inertie_batiment"], index=1)
         with st.expander("Énergies secondaires (optionnel)"):
-            e1, e2 = st.columns(2)
-            with e1:
+            ee1, ee2 = st.columns(2)
+            with ee1:
                 type_energie_n1 = st.selectbox("Type énergie n°1", form_options["type_energie_n1"])
                 type_energie_generateur_n1_ecs_n1 = st.selectbox("Énergie générateur n°1 ECS", form_options["type_energie_generateur_n1_ecs_n1"])
-            with e2:
+            with ee2:
                 type_energie_n2 = st.selectbox("Type énergie n°2", form_options["type_energie_n2"])
     submitted = st.form_submit_button("🚀 Lancer la prédiction", use_container_width=True)
 
