@@ -71,7 +71,7 @@ Nous avons testé deux approches principales. Voici les meilleures performances 
 * **Accuracy** : **58.3%**.
 * *Analyse* : Le modèle rencontre des difficultés aux frontières des classes (ex: distinguer un "C bas" d'un "D haut"), mais capture bien la tendance globale.
 
-### 2. Régression (Prédiction de la consommation)
+### 2. Régression (Prédiction de la consommation et des émissions de GES)
 * **Meilleur Modèle** : Réseau de Neurones (Deep Learning).
 * **R² (Score)** : **0.69**.
 * **MAE (Erreur Absolue Moyenne)** : **36.6 kWh/m²/an**.
@@ -102,7 +102,7 @@ L'application Streamlit est structurée en trois parties :
 
 ```bash
 ├── img/                # Images pour l'application
-├── models/             # Modèles entraînés
+├── models/             # Modèles entraînés et réutilisables pour faire les prédictions
 ├── notebooks/          # Jupyter Notebooks (EDA, Preprocessing, Modeling)
 ├── app.py              # Application principale Streamlit
 ├── requirements.txt    # Liste des dépendances
@@ -115,7 +115,7 @@ Si vous souhaitez faire tourner le projet sur votre machine :
 
 Cloner le dépôt :
 ```bash
-git clone [https://github.com/VOTRE-USER/VOTRE-REPO.git](https://github.com/VOTRE-USER/VOTRE-REPO.git)
+git clone [https://github.com/dst-dpe/Projet_DPE.git](https://github.com/dst-dpe/Projet_DPE.git)
 cd VOTRE-REPO
 ```
 
