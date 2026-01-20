@@ -1169,7 +1169,7 @@ def page_simulator():
                     )
 
 
-                df_group = group_by_original_column(df_imp)
+                df_group = group_by_original_column(df_imp, preprocess_conso)
                 st.caption("Regroupement par variable avant OHE (plus lisible).")
                 st.dataframe(df_group.head(20), use_container_width=True)
 
