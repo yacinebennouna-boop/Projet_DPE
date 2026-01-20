@@ -977,7 +977,7 @@ def page_simulator():
                 f"?type=dpe&modele=2021&valeur={int(round(conso_pred))}"
                 f"&lettre={classe_finale}&valeurges={int(round(ges_pred))}"
             )
-            st.image(base_url + params, use_container_width=True)
+            st.image(base_url + params, width=400)
 
         st.success("Prédiction terminée")
         st.warning("""
