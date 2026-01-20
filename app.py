@@ -980,6 +980,20 @@ def page_simulator():
             st.image(base_url + params, use_container_width=True)
 
         st.success("Prédiction terminée")
+        st.warning("""
+        **Disclaimer – Usage des prédictions**
+        
+        Les résultats affichés par cette application sont issus d’un modèle de
+        machine learning entraîné sur des données historiques.
+        
+        Ils sont fournis **à titre indicatif et pédagogique** et ne constituent
+        **en aucun cas un Diagnostic de Performance Énergétique (DPE) officiel**
+        au sens réglementaire.
+        
+        Les prédictions doivent être interprétées avec prudence, compte tenu des
+        limites liées à la qualité des données, aux hypothèses de modélisation
+        et à la généralisation du modèle.
+        """)
         with st.expander("🔎 Données envoyées au modèle (debug)"):
             st.json(raw_features)
 
