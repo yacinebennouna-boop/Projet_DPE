@@ -15,6 +15,101 @@ import torch.nn as nn
 # preprocessing_custom
 from sklearn.base import BaseEstimator, TransformerMixin
 
+
+def predict_from_X_scaled(model, y_scaler, X_scaled_2d: np.ndarray) -> float:
+    """X_scaled_2d: shape (1, n_features)"""
+    X_tensor = torch.tensor(X_scaled_2d.astype(np.float32))
+    with torch.no_grad():
+        y_scaled = model(X_tensor).cpu().numpy()  # (1,1)
+    y = y_scaler.inverse_transform(y_scaled)[0, 0]
+    return float(y)
+
+def local_permutation_importance(
+    model,
+    y_scaler,
+    X_scaled_2d: np.ndarray,
+    feature_names: list[str],
+    n_repeats: int = 10,
+    mode: str = "shuffle",
+    random_state: int = 42,
+):
+    """
+    Importance locale sur un seul individu.
+    - mode="shuffle": remplace la feature par une valeur tirée autour (bruit)
+    - mode="zero": met la feature à 0 (utile car données standardisées)
+    Retourne un DataFrame trié décroissant.
+    """
+    rng = np.random.default_rng(random_state)
+
+    base_pred = predict_from_X_scaled(model, y_scaler, X_scaled_2d)
+    x0 = X_scaled_2d.copy()
+
+    importances = []
+    for j in range(x0.shape[1]):
+        deltas = []
+        for _ in range(n_repeats):
+            x_pert = x0.copy()
+
+            if mode == "zero":
+                x_pert[0, j] = 0.0
+            else:
+                # bruit gaussien autour de la valeur (ok en standardisé)
+                sigma = 1.0
+                x_pert[0, j] = float(x0[0, j] + rng.normal(0.0, sigma))
+
+            pred_pert = predict_from_X_scaled(model, y_scaler, x_pert)
+            deltas.append(abs(pred_pert - base_pred))
+
+        importances.append(float(np.mean(deltas)))
+
+    df_imp = pd.DataFrame({
+        "feature": feature_names,
+        "impact_abs_moyen": importances
+    }).sort_values("impact_abs_moyen", ascending=False).reset_index(drop=True)
+
+    return base_pred, df_imp
+
+
+def get_X_scaled_and_feature_names(preprocess, raw_features: dict):
+    X_raw = pd.DataFrame([raw_features]).replace({None: np.nan})
+
+    # ✅ transform "soft" (n'affecte pas ta prédiction principale)
+    X_scaled = safe_transform(preprocess, X_raw)
+
+    try:
+        ct = preprocess.named_steps["encode_and_scale"]
+        feature_names = ct.get_feature_names_out()
+    except Exception:
+        feature_names = [f"f{i}" for i in range(np.asarray(X_scaled).shape[1])]
+
+    return np.asarray(X_scaled), list(feature_names)
+
+
+
+def safe_transform(preprocess, X_raw: pd.DataFrame):
+    """
+    Transform robuste:
+    - tente preprocess.transform(X_raw)
+    - si erreur 'columns are missing', on aligne sur feature_names_in_ puis on retente
+    """
+    try:
+        return preprocess.transform(X_raw)
+    except Exception as e:
+        msg = str(e)
+        if "columns are missing" in msg and hasattr(preprocess, "feature_names_in_"):
+            expected = list(preprocess.feature_names_in_)
+            X2 = X_raw.copy()
+            for c in expected:
+                if c not in X2.columns:
+                    X2[c] = np.nan
+            X2 = X2[expected]
+            return preprocess.transform(X2)
+        raise
+
+
+
+
+
 class DropColumns(BaseEstimator, TransformerMixin):
     def __init__(self, cols=None):
         # cols peut être None à cause d'anciens pickles
@@ -996,6 +1091,63 @@ def page_simulator():
         """)
         with st.expander("🔎 Données envoyées au modèle (debug)"):
             st.json(raw_features)
+
+        # ----------------------------
+        # Expander d'explicabilité (local)
+        # ----------------------------
+        with st.expander("🔎 Explicabilité : variables qui influencent la prédiction (conso)"):
+            try:
+                X_scaled_2d, feature_names = get_X_scaled_and_feature_names(preprocess_conso, raw_features)
+
+                # base_pred + df_imp via tes helpers déjà ajoutés
+                base_pred, df_imp = local_permutation_importance(
+                    model=model_conso,
+                    y_scaler=y_scaler_conso,
+                    X_scaled_2d=X_scaled_2d,           # shape (1, n_features)
+                    feature_names=feature_names,
+                    n_repeats=10,
+                    mode="zero",                       # marche très bien en standardisé
+                    random_state=42,
+                )
+
+                st.write(f"Consommation prédite (base) : **{base_pred:.1f} kWh/m²/an**")
+
+                # Top 20 features finales (après OHE)
+                st.caption("Top 20 des features finales (après encodage OneHot + scaling).")
+                st.dataframe(df_imp.head(20), use_container_width=True)
+
+                # Optionnel : regroupement plus lisible par variable d'origine
+                def group_ohe(df_imp: pd.DataFrame) -> pd.DataFrame:
+                    def base_name(f: str) -> str:
+                        # sklearn OneHotEncoder sort souvent "col_val" ou "col=val"
+                        if "=" in f:
+                            return f.split("=", 1)[0]
+                        # heuristique : si tu as "col_val", tu peux garder col
+                        # (à ajuster si besoin)
+                        return f.split("_", 1)[0] if "_" in f else f
+
+                    df = df_imp.copy()
+                    df["variable"] = df["feature"].astype(str).apply(base_name)
+                    return (
+                        df.groupby("variable", as_index=False)["impact_abs_moyen"]
+                        .sum()
+                        .sort_values("impact_abs_moyen", ascending=False)
+                        .reset_index(drop=True)
+                    )
+
+                df_group = group_ohe(df_imp)
+                st.caption("Regroupement approximatif par variable (plus lisible).")
+                st.dataframe(df_group.head(20), use_container_width=True)
+
+                # Debug utile pour interop locale
+                with st.expander("🧪 Debug (features envoyées au modèle)"):
+                    st.json(raw_features)
+
+            except Exception as e:
+                st.warning(
+                    "Impossible de calculer l'explicabilité pour cette prédiction.\n\n"
+                    f"Détail : {e}"
+                )
 
 # ----------------------------
 # ROUTER
