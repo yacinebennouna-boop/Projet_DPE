@@ -43,6 +43,9 @@ def local_permutation_importance(
 
     base_pred = predict_from_X_scaled(model, y_scaler, X_scaled_2d)
     x0 = X_scaled_2d.copy()
+    if x0.ndim != 2 or x0.shape[0] != 1 or x0.shape[1] == 0:
+        raise ValueError(f"X_scaled_2d doit être shape (1, n_features). Reçu {x0.shape}")
+
 
     importances = []
     for j in range(x0.shape[1]):
@@ -73,16 +76,33 @@ def local_permutation_importance(
 def get_X_scaled_and_feature_names(preprocess, raw_features: dict):
     X_raw = pd.DataFrame([raw_features]).replace({None: np.nan})
 
-    # ✅ transform "soft" (n'affecte pas ta prédiction principale)
-    X_scaled = safe_transform(preprocess, X_raw)
+    X_scaled = preprocess.transform(X_raw)
 
+    # ✅ si scipy sparse matrix -> densifier
+    if hasattr(X_scaled, "toarray"):
+        X_scaled = X_scaled.toarray()
+
+    # ✅ forcer un vrai ndarray float32 (pas object)
+    X_scaled = np.asarray(X_scaled, dtype=np.float32)
+
+    # ✅ garantir shape (1, n_features)
+    if X_scaled.ndim == 1:
+        X_scaled = X_scaled.reshape(1, -1)
+
+    # Noms des features finales (après OHE + num)
+    feature_names = []
     try:
         ct = preprocess.named_steps["encode_and_scale"]
-        feature_names = ct.get_feature_names_out()
+        feature_names = list(ct.get_feature_names_out())
     except Exception:
-        feature_names = [f"f{i}" for i in range(np.asarray(X_scaled).shape[1])]
+        feature_names = []
 
-    return np.asarray(X_scaled), list(feature_names)
+    # ✅ fallback si pas de noms, ou mismatch longueur
+    if (not feature_names) or (len(feature_names) != X_scaled.shape[1]):
+        feature_names = [f"f{i}" for i in range(X_scaled.shape[1])]
+
+    return X_scaled, feature_names
+
 
 
 
@@ -1089,16 +1109,13 @@ def page_simulator():
         limites liées à la qualité des données, aux hypothèses de modélisation
         et à la généralisation du modèle.
         """)
-        with st.expander("🔎 Données envoyées au modèle (debug)"):
-            st.json(raw_features)
-
         # ----------------------------
         # Expander d'explicabilité (local)
         # ----------------------------
         with st.expander("🔎 Explicabilité : variables qui influencent la prédiction (conso)"):
             try:
                 X_scaled_2d, feature_names = get_X_scaled_and_feature_names(preprocess_conso, raw_features)
-
+                
                 # base_pred + df_imp via tes helpers déjà ajoutés
                 base_pred, df_imp = local_permutation_importance(
                     model=model_conso,
@@ -1117,17 +1134,33 @@ def page_simulator():
                 st.dataframe(df_imp.head(20), use_container_width=True)
 
                 # Optionnel : regroupement plus lisible par variable d'origine
-                def group_ohe(df_imp: pd.DataFrame) -> pd.DataFrame:
-                    def base_name(f: str) -> str:
-                        # sklearn OneHotEncoder sort souvent "col_val" ou "col=val"
-                        if "=" in f:
-                            return f.split("=", 1)[0]
-                        # heuristique : si tu as "col_val", tu peux garder col
-                        # (à ajuster si besoin)
-                        return f.split("_", 1)[0] if "_" in f else f
+                def group_by_original_column(df_imp: pd.DataFrame, preprocess) -> pd.DataFrame:
+                    """
+                    Regroupe les importances par colonne d'origine (avant OHE), même si les colonnes contiennent des '_'.
+                    On utilise la liste des colonnes vues à l'entraînement (feature_names_in_) et on matche par préfixe.
+                    """
+                    expected = list(getattr(preprocess, "feature_names_in_", []))
+
+                    # On trie par longueur décroissante pour matcher le plus long préfixe possible (important pour les '_')
+                    expected_sorted = sorted(expected, key=len, reverse=True)
+
+                    def infer_base_col(feat_name: str) -> str:
+                        # si le feature_name correspond exactement à une colonne (numérique ou ordinal déjà mappé)
+                        if feat_name in expected:
+                            return feat_name
+
+                        # sinon, on cherche le plus long préfixe "<col>_" (cas OneHotEncoder)
+                        for col in expected_sorted:
+                            prefix = col + "_"
+                            if feat_name.startswith(prefix):
+                                return col
+
+                        # fallback : inconnu
+                        return "(autres)"
 
                     df = df_imp.copy()
-                    df["variable"] = df["feature"].astype(str).apply(base_name)
+                    df["variable"] = df["feature"].astype(str).apply(infer_base_col)
+
                     return (
                         df.groupby("variable", as_index=False)["impact_abs_moyen"]
                         .sum()
@@ -1135,8 +1168,9 @@ def page_simulator():
                         .reset_index(drop=True)
                     )
 
-                df_group = group_ohe(df_imp)
-                st.caption("Regroupement approximatif par variable (plus lisible).")
+
+                df_group = group_by_original_column(df_imp)
+                st.caption("Regroupement par variable avant OHE (plus lisible).")
                 st.dataframe(df_group.head(20), use_container_width=True)
 
                 # Debug utile pour interop locale
