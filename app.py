@@ -1136,26 +1136,38 @@ def page_simulator():
                 # Optionnel : regroupement plus lisible par variable d'origine
                 def group_by_original_column(df_imp: pd.DataFrame, preprocess) -> pd.DataFrame:
                     """
-                    Regroupe les importances par colonne d'origine (avant OHE), même si les colonnes contiennent des '_'.
-                    On utilise la liste des colonnes vues à l'entraînement (feature_names_in_) et on matche par préfixe.
+                    Regroupe les importances par colonne d'origine (avant OHE) de façon robuste.
+                    On récupère les colonnes réellement vues par le ColumnTransformer (cat + num),
+                    puis on matche par préfixe le plus long.
                     """
-                    expected = list(getattr(preprocess, "feature_names_in_", []))
+                    ct = preprocess.named_steps.get("encode_and_scale", None)
+                    if ct is None:
+                        # fallback : pas de regroupement possible
+                        df = df_imp.copy()
+                        df["variable"] = "(inconnu)"
+                        return df.groupby("variable", as_index=False)["impact_abs_moyen"].sum()
 
-                    # On trie par longueur décroissante pour matcher le plus long préfixe possible (important pour les '_')
-                    expected_sorted = sorted(expected, key=len, reverse=True)
+                    # Récupère les colonnes sources réellement utilisées par cat/num
+                    used_cols = []
+                    for name, transformer, cols in ct.transformers_:
+                        if name in ("cat", "num"):
+                            # cols peut être un array de noms de colonnes
+                            if isinstance(cols, (list, tuple, np.ndarray)):
+                                used_cols.extend(list(cols))
+
+                    used_cols = [c for c in used_cols if isinstance(c, str)]
+                    used_cols = sorted(set(used_cols), key=len, reverse=True)
 
                     def infer_base_col(feat_name: str) -> str:
-                        # si le feature_name correspond exactement à une colonne (numérique ou ordinal déjà mappé)
-                        if feat_name in expected:
+                        # exact match : num features souvent = nom de colonne
+                        if feat_name in used_cols:
                             return feat_name
 
-                        # sinon, on cherche le plus long préfixe "<col>_" (cas OneHotEncoder)
-                        for col in expected_sorted:
-                            prefix = col + "_"
-                            if feat_name.startswith(prefix):
+                        # match préfixe long : ohe -> "<col>_<modalité>"
+                        for col in used_cols:
+                            if feat_name.startswith(col + "_"):
                                 return col
 
-                        # fallback : inconnu
                         return "(autres)"
 
                     df = df_imp.copy()
@@ -1167,6 +1179,7 @@ def page_simulator():
                         .sort_values("impact_abs_moyen", ascending=False)
                         .reset_index(drop=True)
                     )
+
 
 
                 df_group = group_by_original_column(df_imp, preprocess_conso)
