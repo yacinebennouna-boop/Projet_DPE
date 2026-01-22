@@ -651,7 +651,84 @@ def page_results():
                 "F1-Score": [0.58, 0.43, 0.72, 0.60, 0.47, 0.25, 0.52]
             }
             st.dataframe(pd.DataFrame(report_data).set_index("Classe").style.background_gradient(cmap="Reds", subset=["F1-Score"]))
+                    st.subheader("3. Interprétabilité (SHAP)")
 
+        st.markdown("""
+        **Les classes A à G correspondent aux étiquettes DPE énergie.**
+
+        **Lecture d’un beeswarm SHAP :**
+        - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
+        - **Axe horizontal** : impact sur la prédiction
+          - à droite : pousse vers une étiquette **plus dégradée**
+          - à gauche : pousse vers une étiquette **meilleure**
+        - **Dispersion verticale** : variabilité de l’effet dans le jeu de données
+        """)
+
+        # Figures SHAP pré-calculées (recommandé : stable et léger)
+        col_a, col_b = st.columns(2)
+
+        with col_a:
+            display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
+        with col_b:
+            display_img("shap_global_beeswarm.png", "SHAP global- top features")
+
+        with st.expander("Détail par classe (exemples A / D / G)"):
+            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
+            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
+            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
+
+        with st.expander("Exemple d'explicabilité locale (waterfall)"):
+            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
+
+
+            st.markdown("#### Rapport de Classification (Optimisé)")
+            st.markdown("""
+            Le rapport de classification permet de comparer, pour chaque étiquette (A à G), la précision, le rappel et le F1-score.
+            On observe généralement une meilleure performance sur les classes centrales (C/D/E) et une difficulté accrue sur les classes extrêmes (A/B et F/G).
+            """)
+
+            # Matrice de confusion normalisée (image exportée depuis le notebook)
+            st.markdown("#### Matrice de confusion normalisée")
+            display_img("confusion_matrix_norm.png", "Matrice de confusion normalisée (par classe réelle)")
+
+            # Pires confusions (table ou figure exportée depuis le notebook)
+            st.markdown("#### Principales confusions du modèle")
+            display_img("top_errors.png", "Top confusions (vrai vs prédit)")
+
+            # Performance par classe (barplot exporté depuis le notebook)
+            st.markdown("#### Performance par classe")
+            display_img("perf_par_classe.png", "Précision / rappel / F1-score par classe")
+        st.subheader("3. Interprétabilité (SHAP)")
+
+        st.markdown("""
+        **Les classes A à G correspondent aux étiquettes DPE énergie.**
+
+        **Lecture d’un beeswarm SHAP :**
+        - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
+        - **Position horizontale** : impact sur la prédiction  
+          - à droite : pousse vers une étiquette **plus dégradée**
+          - à gauche : pousse vers une étiquette **meilleure**
+        - **Dispersion verticale** : variabilité de l’effet selon les logements
+
+        Les variables attendues “métier” (surface, période de construction, isolation, énergie/système de chauffage) ressortent de manière cohérente,
+        ce qui renforce la crédibilité de l’approche.
+        """)
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
+        with col_b:
+            display_img("shap_global_beeswarm.png", "SHAP global — beeswarm")
+
+        with st.expander("Détail par classe (exemples A / D / G)"):
+            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
+            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
+            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
+
+        with st.expander("Exemple d'explicabilité locale (waterfall)"):
+            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
+
+    
     # --- ONGLET 2 : REGRESSION ---
     with tab_reg:
         st.header("Estimation de la consommation énergétique")
