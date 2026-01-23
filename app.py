@@ -634,142 +634,119 @@ def page_results():
         met2.metric("F1-Score Weighted", "0.575")
         met3.metric("Meilleur params", "500 arbres, Max Depth 20")
 
-        # Analyse des erreurs
-        with st.expander("🔎 Analyse détaillée (Matrice de Confusion & Rapport)"):
-            st.markdown("#### Pourquoi plafonne-t-on à 58% ?")
-            st.markdown("""
-            L'analyse de la matrice de confusion montre que les erreurs sont principalement **"à une classe près"** :
-            * Le modèle confond souvent **C et D** (les classes majoritaires).
-            * Difficulté sur les extrêmes (A/B et F/G) à cause du déséquilibre de classe.
-            """)
-            
-            st.markdown("#### Rapport de Classification (Optimisé)")
-            report_data = {
-                "Classe": ["A", "B", "C", "D", "E", "F", "G"],
-                "Precision": [0.65, 0.60, 0.72, 0.56, 0.46, 0.39, 0.53],
-                "Recall": [0.52, 0.33, 0.72, 0.65, 0.48, 0.18, 0.52],
-                "F1-Score": [0.58, 0.43, 0.72, 0.60, 0.47, 0.25, 0.52]
-            }
-            st.dataframe(pd.DataFrame(report_data).set_index("Classe").style.background_gradient(cmap="Reds", subset=["F1-Score"]))
-                    st.subheader("3. Interprétabilité (SHAP)")
+      # Analyse des erreurs
+with st.expander("🔎 Analyse détaillée (Matrice de Confusion & Rapport)"):
+    st.markdown("#### Pourquoi plafonne-t-on à 58% ?")
+    st.markdown("""
+    L'analyse de la matrice de confusion montre que les erreurs sont principalement **"à une classe près"** :
+    * Le modèle confond souvent **C et D** (les classes majoritaires).
+    * Difficulté sur les extrêmes (A/B et F/G) à cause du déséquilibre de classe.
+    """)
 
-        st.markdown("""
-        **Les classes A à G correspondent aux étiquettes DPE énergie.**
+    st.markdown("#### Rapport de Classification (Optimisé)")
+    report_data = {
+        "Classe": ["A", "B", "C", "D", "E", "F", "G"],
+        "Precision": [0.65, 0.60, 0.72, 0.56, 0.46, 0.39, 0.53],
+        "Recall": [0.52, 0.33, 0.72, 0.65, 0.48, 0.18, 0.52],
+        "F1-Score": [0.58, 0.43, 0.72, 0.60, 0.47, 0.25, 0.52],
+    }
+    st.dataframe(
+        pd.DataFrame(report_data)
+        .set_index("Classe")
+        .style.background_gradient(cmap="Reds", subset=["F1-Score"])
+    )
 
-        **Lecture d’un beeswarm SHAP :**
-        - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
-        - **Axe horizontal** : impact sur la prédiction
-          - à droite : pousse vers une étiquette **plus dégradée**
-          - à gauche : pousse vers une étiquette **meilleure**
-        - **Dispersion verticale** : variabilité de l’effet dans le jeu de données
-        """)
+    st.markdown("""
+    Le rapport de classification permet de comparer, pour chaque étiquette (A à G), la précision, le rappel et le F1-score.
+    On observe généralement une meilleure performance sur les classes centrales (C/D/E) et une difficulté accrue sur les classes extrêmes (A/B et F/G).
+    """)
 
-        # Figures SHAP pré-calculées (recommandé : stable et léger)
-        col_a, col_b = st.columns(2)
+    st.markdown("#### Matrice de confusion normalisée")
+    display_img("confusion_matrix_norm.png", "Matrice de confusion normalisée (par classe réelle)")
 
-        with col_a:
-            display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
-        with col_b:
-            display_img("shap_global_beeswarm.png", "SHAP global- top features")
+    st.markdown("#### Principales confusions du modèle")
+    display_img("top_errors.png", "Top confusions (vrai vs prédit)")
 
-        with st.expander("Détail par classe (exemples A / D / G)"):
-            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
-            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
-            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
-
-        with st.expander("Exemple d'explicabilité locale (waterfall)"):
-            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
+    st.markdown("#### Performance par classe")
+    display_img("perf_par_classe.png", "Précision / rappel / F1-score par classe")
 
 
-            st.markdown("#### Rapport de Classification (Optimisé)")
-            st.markdown("""
-            Le rapport de classification permet de comparer, pour chaque étiquette (A à G), la précision, le rappel et le F1-score.
-            On observe généralement une meilleure performance sur les classes centrales (C/D/E) et une difficulté accrue sur les classes extrêmes (A/B et F/G).
-            """)
+st.subheader("3. Interprétabilité (SHAP)")
 
-            # Matrice de confusion normalisée (image exportée depuis le notebook)
-            st.markdown("#### Matrice de confusion normalisée")
-            display_img("confusion_matrix_norm.png", "Matrice de confusion normalisée (par classe réelle)")
+st.markdown("""
+**Les classes A à G correspondent aux étiquettes DPE énergie.**
 
-            # Pires confusions (table ou figure exportée depuis le notebook)
-            st.markdown("#### Principales confusions du modèle")
-            display_img("top_errors.png", "Top confusions (vrai vs prédit)")
+**Lecture d’un beeswarm SHAP :**
+- **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
+- **Position horizontale** : impact sur la prédiction
+  - à droite : pousse vers une étiquette **plus dégradée**
+  - à gauche : pousse vers une étiquette **meilleure**
+- **Dispersion verticale** : variabilité de l’effet selon les logements
 
-            # Performance par classe (barplot exporté depuis le notebook)
-            st.markdown("#### Performance par classe")
-            display_img("perf_par_classe.png", "Précision / rappel / F1-score par classe")
-        st.subheader("3. Interprétabilité (SHAP)")
+Les variables attendues “métier” (surface, période de construction, isolation, énergie/système de chauffage) ressortent de manière cohérente,
+ce qui renforce la crédibilité de l’approche.
+""")
 
-        st.markdown("""
-        **Les classes A à G correspondent aux étiquettes DPE énergie.**
+col_a, col_b = st.columns(2)
+with col_a:
+    display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
+with col_b:
+    display_img("shap_global_beeswarm.png", "SHAP global — beeswarm")
 
-        **Lecture d’un beeswarm SHAP :**
-        - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
-        - **Position horizontale** : impact sur la prédiction  
-          - à droite : pousse vers une étiquette **plus dégradée**
-          - à gauche : pousse vers une étiquette **meilleure**
-        - **Dispersion verticale** : variabilité de l’effet selon les logements
+with st.expander("Détail par classe (exemples A / D / G)"):
+    display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
+    display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
+    display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
 
-        Les variables attendues “métier” (surface, période de construction, isolation, énergie/système de chauffage) ressortent de manière cohérente,
-        ce qui renforce la crédibilité de l’approche.
-        """)
+with st.expander("Exemple d'explicabilité locale (waterfall)"):
+    display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
-        with col_b:
-            display_img("shap_global_beeswarm.png", "SHAP global — beeswarm")
 
-        with st.expander("Détail par classe (exemples A / D / G)"):
-            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
-            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
-            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
+# --- ONGLET 2 : REGRESSION ---
+with tab_reg:
+    st.header("Estimation de la consommation énergétique")
+    st.markdown("Objectif : Prédire une valeur continue (kWh/m²/an).")
 
-        with st.expander("Exemple d'explicabilité locale (waterfall)"):
-            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
+    # 1. Benchmark ML Classique
+    st.subheader("1. Benchmark Machine Learning")
+    data_reg = {
+        "Modèle": ["Random Forest", "KNN Regressor", "Lasso/Ridge/Linear", "Decision Tree"],
+        "MAE": [44.75, 47.86, 54.79, 59.56],
+        "R²": [0.645, 0.576, 0.491, 0.424],
+    }
+    df_reg = pd.DataFrame(data_reg).sort_values(by="R²", ascending=False)
 
-    
-    # --- ONGLET 2 : REGRESSION ---
-    with tab_reg:
-        st.header("Estimation de la consommation énergétique")
-        st.markdown("Objectif : Prédire une valeur continue (kWh/m²/an).")
+    st.dataframe(
+        df_reg.style.highlight_max(subset=["R²"], color="#d1e7dd")
+        .highlight_min(subset=["MAE"], color="#d1e7dd"),
+        use_container_width=True,
+    )
+    st.caption("Le Random Forest domine largement les modèles linéaires classiques.")
 
-        # 1. Benchmark ML Classique
-        st.subheader("1. Benchmark Machine Learning")
-        data_reg = {
-            "Modèle": ["Random Forest", "KNN Regressor", "Lasso/Ridge/Linear", "Decision Tree"],
-            "MAE": [44.75, 47.86, 54.79, 59.56],
-            "R²": [0.645, 0.576, 0.491, 0.424]
-        }
-        df_reg = pd.DataFrame(data_reg).sort_values(by="R²", ascending=False)
-        
-        st.dataframe(df_reg.style.highlight_max(subset=["R²"], color="#d1e7dd").highlight_min(subset=["MAE"], color="#d1e7dd"), use_container_width=True)
-        st.caption("Le Random Forest domine largement les modèles linéaires classiques.")
+    st.divider()
 
-        st.divider()
+    # 2. Deep Learning vs Random Forest
+    st.subheader("2. Le saut de performance : Deep Learning")
+    st.markdown("""
+    Nous avons entraîné un réseau de neurones avec plus de colonnes en entrée.
+    C'est l'approche qui donne les **meilleurs résultats globaux**.
+    """)
 
-        # 2. Deep Learning vs Random Forest
-        st.subheader("2. Le saut de performance : Deep Learning")
-        st.markdown("""
-        Nous avons entraîné un réseau de neurones avec plus de colonnes en entrée. 
-        C'est l'approche qui donne les **meilleurs résultats globaux**.
-        """)
+    col_res1, col_res2, col_res3 = st.columns(3)
+    col_res1.metric("MAE (Erreur Moyenne)", "36.6 kWh/m²", delta="-7 kWh vs RF", delta_color="normal")
+    col_res2.metric("RMSE", "49.6")
+    col_res3.metric("R² (Score)", "0.69", delta="+0.05 vs RF")
 
-        col_res1, col_res2, col_res3 = st.columns(3)
-        col_res1.metric("MAE (Erreur Moyenne)", "36.6 kWh/m²", delta="-7 kWh vs RF", delta_color="normal")
-        col_res2.metric("RMSE", "49.6")
-        col_res3.metric("R² (Score)", "0.69", delta="+0.05 vs RF")
+    # 3. Image d'analyse Deep Learning
+    st.markdown("#### Analyse de l'entraînement (Validation Loss)")
+    st.markdown("Comparaison de la convergence selon la taille du batch (Batch Size).")
 
-        # 3. Image d'analyse Deep Learning
-        st.markdown("#### Analyse de l'entraînement (Validation Loss)")
-        st.markdown("Comparaison de la convergence selon la taille du batch (Batch Size).")
-        
-        # Affichage de l'image fournie
-        try:
-            st.image("img/loss_batch_size.png", caption="Comparaison du Val Loss par Batch Size", use_container_width=True)
-            st.info("On remarque qu'un Batch Size plus grand (8192 - courbe verte) converge plus vite et offre une courbe plus stable.")
-        except:
-            st.warning("⚠️ Image 'img/loss_batch_size.png' introuvable.")
+    try:
+        st.image("img/loss_batch_size.png", caption="Comparaison du Val Loss par Batch Size", use_container_width=True)
+        st.info("On remarque qu'un Batch Size plus grand (8192) converge plus vite et offre une courbe plus stable.")
+    except Exception:
+        st.warning("Image 'img/loss_batch_size.png' introuvable.")
+
 
 
 
