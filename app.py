@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -474,11 +473,17 @@ def page_presentation():
 # PAGE 2: Dataviz
 # ----------------------------
 
-def display_img(filename, caption=""):
+def display_img(filename, caption="", width=None):
     """Fonction utilitaire pour gérer l'affichage sécurisé des images"""
     path = f"img/{filename}"
     if os.path.exists(path):
-        st.image(path, caption=caption, use_container_width=True)
+        if width:
+            # Centrer l'image avec des colonnes
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image(path, caption=caption, width=width)
+        else:
+            st.image(path, caption=caption, use_container_width=True)
     else:
         st.warning(f"⚠️ Image manquante : {path}")
 
@@ -513,7 +518,7 @@ def page_dataviz():
         st.info("💡 **Note :** On observe souvent une corrélation entre les étiquettes DPE et GES, bien que le mode de chauffage influence fortement le GES.")
 
         st.markdown("### 2. Consommation réelle")
-        display_img("repartition_conso_France.png", "Distribution de la consommation énergétique (kWh/m²/an)")
+        display_img("repartition_conso_France.png", "Distribution de la consommation énergétique (kWh/m²/an)", width=700)
 
     # --- ONGLET 2 : GÉOGRAPHIE ---
     with tab2:
@@ -538,7 +543,7 @@ def page_dataviz():
             display_img("repartition_zone_climatique.png", "Impact du climat local")
             
         st.markdown("#### Focus Altitude")
-        display_img("repartition_classe_altitude.png", "Répartition des classes selon l'altitude")
+        display_img("repartition_classe_altitude.png", "Répartition des classes selon l'altitude", width=700)
 
     # --- ONGLET 3 : CARACTÉRISTIQUES BÂTI ---
     with tab3:
@@ -553,12 +558,12 @@ def page_dataviz():
             display_img("etiquette_GES_type_bat.png", "GES selon le type de logement")
             
         st.markdown("#### Source d'énergie principale")
-        display_img("repartition_type_energie_n1.png", "Répartition par type d'énergie")
+        display_img("repartition_type_energie_n1.png", "Répartition par type d'énergie", width=700)
 
         st.markdown("---")
         st.markdown("### 2. Inertie du bâtiment")
         st.markdown("L'inertie thermique joue un rôle clé dans le confort et la performance.")
-        display_img("repartition_classe_inertie_batiment.png", "Classement selon l'inertie")
+        display_img("repartition_classe_inertie_batiment.png", "Classement selon l'inertie", width=700)
 
     # --- ONGLET 4 : année construction ET SURFACE ---
     with tab4:
@@ -578,7 +583,7 @@ def page_dataviz():
         st.markdown("### 2. L'impact de la surface")
         st.markdown("Les petites surfaces sont-elles défavorisées par le calcul du DPE ?")
         
-        display_img("surface_etiquette_boxplot.png", "Distribution des surfaces par étiquette")
+        display_img("surface_etiquette_boxplot.png", "Distribution des surfaces par étiquette", width=800)
 
         with st.expander("🔎 Détail du nettoyage des données (Outliers)"):
             st.write("Analyse de la distribution des surfaces avant et après traitement des valeurs aberrantes.")
@@ -642,92 +647,63 @@ def page_results():
             * Le modèle confond souvent **C et D** (les classes majoritaires).
             * Difficulté sur les extrêmes (A/B et F/G) à cause du déséquilibre de classe.
             """)
-            
+
             st.markdown("#### Rapport de Classification (Optimisé)")
             report_data = {
                 "Classe": ["A", "B", "C", "D", "E", "F", "G"],
                 "Precision": [0.65, 0.60, 0.72, 0.56, 0.46, 0.39, 0.53],
                 "Recall": [0.52, 0.33, 0.72, 0.65, 0.48, 0.18, 0.52],
-                "F1-Score": [0.58, 0.43, 0.72, 0.60, 0.47, 0.25, 0.52]
+                "F1-Score": [0.58, 0.43, 0.72, 0.60, 0.47, 0.25, 0.52],
             }
-            st.dataframe(pd.DataFrame(report_data).set_index("Classe").style.background_gradient(cmap="Reds", subset=["F1-Score"]))
-                    st.subheader("3. Interprétabilité (SHAP)")
+            st.dataframe(
+                pd.DataFrame(report_data)
+                .set_index("Classe")
+                .style.background_gradient(cmap="Reds", subset=["F1-Score"])
+            )
 
-        st.markdown("""
-        **Les classes A à G correspondent aux étiquettes DPE énergie.**
-
-        **Lecture d’un beeswarm SHAP :**
-        - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
-        - **Axe horizontal** : impact sur la prédiction
-          - à droite : pousse vers une étiquette **plus dégradée**
-          - à gauche : pousse vers une étiquette **meilleure**
-        - **Dispersion verticale** : variabilité de l’effet dans le jeu de données
-        """)
-
-        # Figures SHAP pré-calculées (recommandé : stable et léger)
-        col_a, col_b = st.columns(2)
-
-        with col_a:
-            display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
-        with col_b:
-            display_img("shap_global_beeswarm.png", "SHAP global- top features")
-
-        with st.expander("Détail par classe (exemples A / D / G)"):
-            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
-            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
-            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
-
-        with st.expander("Exemple d'explicabilité locale (waterfall)"):
-            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
-
-
-            st.markdown("#### Rapport de Classification (Optimisé)")
             st.markdown("""
             Le rapport de classification permet de comparer, pour chaque étiquette (A à G), la précision, le rappel et le F1-score.
             On observe généralement une meilleure performance sur les classes centrales (C/D/E) et une difficulté accrue sur les classes extrêmes (A/B et F/G).
             """)
 
-            # Matrice de confusion normalisée (image exportée depuis le notebook)
             st.markdown("#### Matrice de confusion normalisée")
-            display_img("confusion_matrix_norm.png", "Matrice de confusion normalisée (par classe réelle)")
+            display_img("confusion_matrix_norm.png", "Matrice de confusion normalisée (par classe réelle)", width=600)
 
-            # Pires confusions (table ou figure exportée depuis le notebook)
             st.markdown("#### Principales confusions du modèle")
-            display_img("top_errors.png", "Top confusions (vrai vs prédit)")
+            display_img("top_errors.png", "Top confusions (vrai vs prédit)", width=600)
 
-            # Performance par classe (barplot exporté depuis le notebook)
             st.markdown("#### Performance par classe")
-            display_img("perf_par_classe.png", "Précision / rappel / F1-score par classe")
-        st.subheader("3. Interprétabilité (SHAP)")
+            display_img("perf_par_classe.png", "Précision / rappel / F1-score par classe", width=600)
 
+        st.subheader("3. Interprétabilité (SHAP)")
+        
         st.markdown("""
         **Les classes A à G correspondent aux étiquettes DPE énergie.**
-
-        **Lecture d’un beeswarm SHAP :**
+        
+        **Lecture d'un beeswarm SHAP :**
         - **Couleur** : valeur de la variable (bleu = faible, rouge = élevée)
-        - **Position horizontale** : impact sur la prédiction  
+        - **Position horizontale** : impact sur la prédiction
           - à droite : pousse vers une étiquette **plus dégradée**
           - à gauche : pousse vers une étiquette **meilleure**
-        - **Dispersion verticale** : variabilité de l’effet selon les logements
-
-        Les variables attendues “métier” (surface, période de construction, isolation, énergie/système de chauffage) ressortent de manière cohérente,
-        ce qui renforce la crédibilité de l’approche.
+        - **Dispersion verticale** : variabilité de l'effet selon les logements
+        
+        Les variables attendues "métier" (surface, période de construction, isolation, énergie/système de chauffage) ressortent de manière cohérente,
+        ce qui renforce la crédibilité de l'approche.
         """)
-
+        
         col_a, col_b = st.columns(2)
         with col_a:
             display_img("shap_global_bar.png", "SHAP global — importance (Top 20)")
         with col_b:
             display_img("shap_global_beeswarm.png", "SHAP global — beeswarm")
-
+        
         with st.expander("Détail par classe (exemples A / D / G)"):
-            display_img("shap_class_A_beeswarm.png", "SHAP — classe A")
-            display_img("shap_class_D_beeswarm.png", "SHAP — classe D")
-            display_img("shap_class_G_beeswarm.png", "SHAP — classe G")
-
+            display_img("shap_class_A_beeswarm.png", "SHAP — classe A", width=600)
+            display_img("shap_class_D_beeswarm.png", "SHAP — classe D", width=600)
+            display_img("shap_class_G_beeswarm.png", "SHAP — classe G", width=600)
+        
         with st.expander("Exemple d'explicabilité locale (waterfall)"):
-            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)")
-
+            display_img("shap_local_waterfall_ex1.png", "SHAP local — waterfall (exemple)", width=600)
     
     # --- ONGLET 2 : REGRESSION ---
     with tab_reg:
@@ -739,11 +715,15 @@ def page_results():
         data_reg = {
             "Modèle": ["Random Forest", "KNN Regressor", "Lasso/Ridge/Linear", "Decision Tree"],
             "MAE": [44.75, 47.86, 54.79, 59.56],
-            "R²": [0.645, 0.576, 0.491, 0.424]
+            "R²": [0.645, 0.576, 0.491, 0.424],
         }
         df_reg = pd.DataFrame(data_reg).sort_values(by="R²", ascending=False)
-        
-        st.dataframe(df_reg.style.highlight_max(subset=["R²"], color="#d1e7dd").highlight_min(subset=["MAE"], color="#d1e7dd"), use_container_width=True)
+
+        st.dataframe(
+            df_reg.style.highlight_max(subset=["R²"], color="#d1e7dd")
+            .highlight_min(subset=["MAE"], color="#d1e7dd"),
+            use_container_width=True,
+        )
         st.caption("Le Random Forest domine largement les modèles linéaires classiques.")
 
         st.divider()
@@ -751,7 +731,7 @@ def page_results():
         # 2. Deep Learning vs Random Forest
         st.subheader("2. Le saut de performance : Deep Learning")
         st.markdown("""
-        Nous avons entraîné un réseau de neurones avec plus de colonnes en entrée. 
+        Nous avons entraîné un réseau de neurones avec plus de colonnes en entrée.
         C'est l'approche qui donne les **meilleurs résultats globaux**.
         """)
 
@@ -763,14 +743,9 @@ def page_results():
         # 3. Image d'analyse Deep Learning
         st.markdown("#### Analyse de l'entraînement (Validation Loss)")
         st.markdown("Comparaison de la convergence selon la taille du batch (Batch Size).")
-        
-        # Affichage de l'image fournie
-        try:
-            st.image("img/loss_batch_size.png", caption="Comparaison du Val Loss par Batch Size", use_container_width=True)
-            st.info("On remarque qu'un Batch Size plus grand (8192 - courbe verte) converge plus vite et offre une courbe plus stable.")
-        except:
-            st.warning("⚠️ Image 'img/loss_batch_size.png' introuvable.")
 
+        display_img("loss_batch_size.png", "Comparaison du Val Loss par Batch Size", width=800)
+        st.info("On remarque qu'un Batch Size plus grand (8192) converge plus vite et offre une courbe plus stable.")
 
 
 # ----------------------------
@@ -923,7 +898,7 @@ def page_simulator():
         "type_energie_principale_chauffage": [
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes d'industrie",
             "Bois – Plaquettes forestières",
             "Butane",
             "Charbon",
@@ -948,7 +923,7 @@ def page_simulator():
             "Électricité",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes d'industrie",
             "Bois – Plaquettes forestières",
             "Butane",
             "Charbon",
@@ -964,7 +939,7 @@ def page_simulator():
             "Électricité",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes d'industrie",
             "Bois – Plaquettes forestières",
             "Butane",
             "Charbon",
@@ -979,7 +954,7 @@ def page_simulator():
             "AUCUN",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes d'industrie",
             "Bois – Plaquettes forestières",
             "Butane",
             "Charbon",
@@ -1003,7 +978,7 @@ def page_simulator():
             "Électricité d'origine renouvelable utilisée dans le bâtiment",
             "Bois – Bûches",
             "Bois – Granulés (pellets) ou briquettes",
-            "Bois – Plaquettes d’industrie",
+            "Bois – Plaquettes d'industrie",
             "Bois – Plaquettes forestières",
             "Non affecté",
         ],
@@ -1175,7 +1150,7 @@ def page_simulator():
         st.warning("""
         **Disclaimer – Usage des prédictions**
         
-        Les résultats affichés par cette application sont issus d’un modèle de
+        Les résultats affichés par cette application sont issus d'un modèle de
         machine learning entraîné sur des données historiques.
         
         Ils sont fournis **à titre indicatif et pédagogique** et ne constituent
@@ -1256,8 +1231,6 @@ def page_simulator():
                         .sort_values("impact_abs_moyen", ascending=False)
                         .reset_index(drop=True)
                     )
-
-
 
                 df_group = group_by_original_column(df_imp, preprocess_conso)
                 st.caption("Regroupement par variable avant OHE (plus lisible).")
